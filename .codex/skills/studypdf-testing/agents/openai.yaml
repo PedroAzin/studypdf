@@ -1,0 +1,6 @@
+interface:
+  display_name: "StudyPDF Testing"
+  short_description: "Behavior-first tests for StudyPDF"
+  default_prompt: "Use $studypdf-testing to add behavior-focused tests for the StudyPDF Flask app."
+policy:
+  allow_implicit_invocation: true
