@@ -19,6 +19,10 @@ env/
 instance/
 *.log
 
+# Sonar
+.sonar/
+.scannerwork/
+
 # StudyPDF local data
 data/
 books/
