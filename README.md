@@ -13,6 +13,56 @@ python app.py
 
 Acesse `http://127.0.0.1:5000`.
 
+## Testes e cobertura
+
+Para preparar o ambiente de desenvolvimento e rodar a suite com cobertura:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
+
+O projeto exige no minimo 80% de cobertura via `pytest.ini`.
+
+## Enviar analise para o Sonar
+
+Com a instancia local do SonarQube rodando em `http://localhost:9000`, gere um token no Sonar e exporte em uma variavel de ambiente antes de executar o scan:
+
+```powershell
+$env:SONAR_TOKEN="seu-token"
+.\scripts\sonar-scan.ps1
+```
+
+O script executa `pytest` antes do envio para gerar `coverage.xml`, que e importado pelo Sonar como cobertura Python.
+
+O script usa por padrao:
+
+- host: `http://localhost:9000`
+- project key: `StudyPDF`
+- quality gate: aguardado ao final da analise
+
+Para sobrescrever host ou chave do projeto:
+
+```powershell
+$env:SONAR_TOKEN="seu-token"
+.\scripts\sonar-scan.ps1 -SonarHostUrl "http://localhost:9000" -ProjectKey "StudyPDF"
+```
+
+Tambem e possivel rodar diretamente com `pysonar`:
+
+```powershell
+.\.venv\Scripts\pysonar.exe `
+  --sonar-host-url=http://localhost:9000 `
+  --sonar-token=$env:SONAR_TOKEN `
+  --sonar-project-key=StudyPDF `
+  --sonar-project-name=StudyPDF `
+  --sonar-sources=studypdf,app.py `
+  --sonar-tests=tests `
+  --sonar-python-coverage-report-paths=coverage.xml `
+  --sonar-python-version=3.14 `
+  --sonar-qualitygate-wait
+```
+
 ## Rotas principais
 
 - `GET /`
