@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}StudyPDF Coach{% endblock %}
+{% block content %}
+<section class="shell two-column">
+  <div>
+    <h1>Leitor de estudo com memoria</h1>
+    <p class="lead">Envie um PDF para sua estante, leia no navegador, acompanhe progresso e salve duvidas ou anotacoes recuperaveis depois.</p>
+
+    <form class="upload-form" action="{{ url_for('books.upload_book') }}" method="post" enctype="multipart/form-data" data-upload-form>
+      <label>
+        Titulo
+        <input name="title" type="text" placeholder="Opcional; usa o nome do arquivo">
+      </label>
+      <label>
+        Autor
+        <input name="author" type="text" placeholder="Opcional">
+      </label>
+      <label>
+        PDF
+        <input name="pdf" type="file" accept="application/pdf" required>
+      </label>
+      <button type="submit" data-upload-button>Enviar PDF</button>
+      <div class="upload-status" data-upload-status hidden aria-live="polite">
+        <div class="upload-status-header">
+          <strong data-upload-status-text>Preparando envio</strong>
+          <span>PDF</span>
+        </div>
+        <progress max="100" value="0" data-upload-progress></progress>
+        <p data-upload-detail></p>
+      </div>
+    </form>
+  </div>
+
+  <aside class="panel">
+    <h2>Recentes</h2>
+    {% if recent_books %}
+      <div class="list">
+        {% for book in recent_books %}
+          <a class="list-item" href="{{ url_for('books.read_book', book_id=book.id) }}">
+            <strong>{{ book.title }}</strong>
+            <span>{{ book.author or "Autor nao informado" }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Nenhum livro enviado ainda.</p>
+    {% endif %}
+  </aside>
+</section>
+<script src="{{ url_for('static', filename='upload.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}Nova nota{% else %}Editar nota{% endif %} | {{ book.title }}{% endblock %}
+{% block content %}
+<section class="shell narrow">
+  <div class="section-header">
+    <div>
+      <h1>{% if mode == "create" %}Nova nota{% else %}Editar nota{% endif %}</h1>
+      <p class="muted">{{ book.title }}</p>
+    </div>
+    <a class="button secondary" href="{{ url_for('notes.book_notes', book_id=book.id) }}">Voltar</a>
+  </div>
+
+  <form class="note-form" method="post" action="{% if mode == 'create' %}{{ url_for('notes.create_note_form', book_id=book.id) }}{% else %}{{ url_for('notes.update_note_form', note_id=note.id) }}{% endif %}">
+    <div class="form-grid">
+      <label>
+        Pagina
+        <select name="page_number" required>
+          {% for page in pages %}
+            <option value="{{ page.page_number }}" {% if page.page_number == note.page_number|int %}selected{% endif %}>Pagina {{ page.page_number }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        Tipo
+        <select name="note_type" required>
+          {% for note_type in note_types %}
+            <option value="{{ note_type }}" {% if note_type == note.note_type %}selected{% endif %}>{{ note_type }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <label>
+      Trecho
+      <textarea name="selected_text" required>{{ note.selected_text }}</textarea>
+    </label>
+
+    <label>
+      Nota
+      <textarea name="note_text">{{ note.note_text or "" }}</textarea>
+    </label>
+
+    <label>
+      Tags
+      <input name="tags" type="text" value="{{ note.tags or '' }}" placeholder="replication, distributed-systems">
+    </label>
+
+    <div class="actions">
+      <button type="submit">Salvar nota</button>
+      <a class="button secondary" href="{{ url_for('notes.book_notes', book_id=book.id) }}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

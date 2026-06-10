@@ -1,0 +1,1 @@
+"""StudyPDF application package."""

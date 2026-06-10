@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Destaques | {{ book.title }}{% endblock %}
+{% block content %}
+<section class="shell">
+  <div class="section-header">
+    <div>
+      <h1>Destaques</h1>
+      <p class="muted">{{ book.title }}</p>
+    </div>
+    <a class="button secondary" href="{{ url_for('books.read_book', book_id=book.id) }}">Voltar para leitura</a>
+  </div>
+  {% if highlights %}
+    <div class="notes-list">
+      {% for note in highlights %}
+        <article class="note-card highlight-card">
+          <div class="note-meta">
+            <span>Pagina {{ note.page_number }}</span>
+            {% if note.tags %}<span>{{ note.tags }}</span>{% endif %}
+          </div>
+          <blockquote>{{ note.selected_text }}</blockquote>
+          {% if note.note_text %}<p>{{ note.note_text }}</p>{% endif %}
+          <div class="actions">
+            <a class="button secondary" href="{{ url_for('books.read_book', book_id=book.id) }}#pagina-{{ note.page_number }}">Ir para pagina</a>
+            <a class="button secondary" href="{{ url_for('notes.note_detail', note_id=note.id) }}">Abrir</a>
+            <a class="button secondary" href="{{ url_for('notes.edit_note', note_id=note.id) }}">Editar</a>
+            <form class="inline-form" action="{{ url_for('notes.delete_note_form', note_id=note.id) }}" method="post">
+              <button class="danger" type="submit" onclick="return confirm('Remover este destaque?')">Remover</button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Nenhum destaque salvo para este livro.</p>
+  {% endif %}
+</section>
+{% endblock %}

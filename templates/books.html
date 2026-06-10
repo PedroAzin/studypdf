@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Estante | StudyPDF Coach{% endblock %}
+{% block content %}
+<section class="shell">
+  <div class="section-header">
+    <h1>Estante</h1>
+    <a class="button secondary" href="{{ url_for('main.index') }}">Enviar novo PDF</a>
+  </div>
+  {% if books %}
+    <div class="shelf-grid">
+      {% for book in books %}
+        <article class="book-card shelf-card{% if book.is_processing %} is-processing{% endif %}{% if book.is_failed %} is-failed{% endif %}" data-book-id="{{ book.id }}" data-book-status="{{ book.status }}">
+          <div class="book-card-header">
+            <div>
+              <h2>{{ book.title }}</h2>
+              <p>{{ book.author or "Autor nao informado" }}</p>
+            </div>
+            {% if book.is_processing %}
+              <strong class="progress-pill processing">Processando</strong>
+            {% elif book.is_failed %}
+              <strong class="progress-pill failed">Falhou</strong>
+            {% else %}
+              <strong class="progress-pill">{{ book.percent_read }}% lido</strong>
+            {% endif %}
+          </div>
+          {% if book.is_processing %}
+            <p class="processing-message">O PDF esta na fila. A estante sera atualizada quando o processamento terminar.</p>
+          {% elif book.is_failed %}
+            <p class="processing-message error">{{ book.processing_error or "Falha ao processar o PDF." }}</p>
+          {% endif %}
+          <div class="shelf-progress" aria-label="Progresso de leitura">
+            <span style="width: {{ book.percent_read }}%"></span>
+          </div>
+          <div class="book-stats">
+            <span>pagina {{ book.last_page_read or 1 }}</span>
+            <span>{{ book.total_pages or 0 }} paginas</span>
+            <span>{{ book.total_chapters or 0 }} capitulos</span>
+            <span>{{ book.total_highlights or 0 }} destaques</span>
+            <span>{{ book.total_notes or 0 }} notas</span>
+          </div>
+          {% if book.chapters %}
+            <div class="chapter-preview">
+              <h3>Capitulos</h3>
+              {% for chapter in book.chapters %}
+                <a href="{{ url_for('books.read_book', book_id=book.id) }}#pagina-{{ chapter.start_page }}">
+                  <span>{{ chapter.title }}</span>
+                  <small>{{ chapter.start_page }}-{{ chapter.end_page }}</small>
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="actions">
+            {% if book.is_ready %}
+              <a class="button" href="{{ url_for('books.read_book', book_id=book.id) }}#pagina-{{ book.last_page_read or 1 }}">Continuar</a>
+              <a class="button secondary" href="{{ url_for('notes.book_notes', book_id=book.id) }}">Notas</a>
+              <a class="button secondary" href="{{ url_for('notes.book_highlights', book_id=book.id) }}">Destaques</a>
+              <form action="{{ url_for('books.reset_book', book_id=book.id) }}" method="post" onsubmit="return confirmResetBook(this);">
+                <input type="hidden" name="confirmation">
+                <button class="danger" type="submit">Reiniciar</button>
+              </form>
+            {% else %}
+              <span class="button disabled" aria-disabled="true">Continuar</span>
+            {% endif %}
+            <form action="{{ url_for('books.delete_book', book_id=book.id) }}" method="post" onsubmit="return confirm('Remover este livro e todas as notas?');">
+              <button class="danger" type="submit">Remover</button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Nenhum livro na estante.</p>
+  {% endif %}
+</section>
+<script src="{{ url_for('static', filename='shelf.js') }}"></script>
+<script>
+  function confirmResetBook(form) {
+    const typed = window.prompt("Isto vai limpar progresso, notas, destaques e checkpoints. Digite REINICIAR para confirmar.");
+    if (typed !== "REINICIAR") return false;
+    form.querySelector("input[name='confirmation']").value = typed;
+    return true;
+  }
+</script>
+{% endblock %}

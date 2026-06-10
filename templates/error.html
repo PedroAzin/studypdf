@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | StudyPDF Coach{% endblock %}
+{% block content %}
+<section class="shell narrow">
+  <div class="error-panel">
+    <p class="error-kicker">Nao concluido</p>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="actions">
+      <a class="button" href="{{ url_for('main.index') }}">Voltar ao upload</a>
+      <a class="button secondary" href="{{ url_for('books.books') }}">Ver livros</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

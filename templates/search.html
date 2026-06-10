@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Busca | StudyPDF Coach{% endblock %}
+{% block content %}
+<section class="shell">
+  <h1>Busca</h1>
+  <form class="search-form" role="search">
+    <input id="search-query" type="search" value="{{ query }}" placeholder="Buscar por trecho, nota, tag ou livro">
+    <button type="submit">Buscar</button>
+  </form>
+  <div id="search-results" class="notes-list"></div>
+</section>
+<script src="{{ url_for('static', filename='search.js') }}"></script>
+{% endblock %}

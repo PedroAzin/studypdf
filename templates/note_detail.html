@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Nota {{ note.id }} | StudyPDF Coach{% endblock %}
+{% block content %}
+<section class="shell narrow">
+  <div class="section-header">
+    <h1>Nota {{ note.id }}</h1>
+    <div class="actions">
+      <a class="button secondary" href="{{ url_for('notes.book_notes', book_id=note.book_id) }}">Voltar</a>
+      <a class="button secondary" href="{{ url_for('notes.edit_note', note_id=note.id) }}">Editar</a>
+      <a class="button" href="{{ url_for('notes.export_note', note_id=note.id) }}">Exportar para IA</a>
+      <form class="inline-form" action="{{ url_for('notes.delete_note_form', note_id=note.id) }}" method="post">
+        <button class="danger" type="submit" onclick="return confirm('Remover esta nota?')">Remover</button>
+      </form>
+    </div>
+  </div>
+  <dl class="details">
+    <dt>Livro</dt>
+    <dd>{{ note.book_title }}</dd>
+    <dt>Pagina</dt>
+    <dd>{{ note.page_number }}</dd>
+    <dt>Tipo</dt>
+    <dd>{{ note.note_type }}</dd>
+    <dt>Tags</dt>
+    <dd>{{ note.tags or "Sem tags" }}</dd>
+    <dt>Trecho</dt>
+    <dd>{{ note.selected_text }}</dd>
+    <dt>Nota</dt>
+    <dd>{{ note.note_text or "Sem texto adicional" }}</dd>
+  </dl>
+</section>
+{% endblock %}

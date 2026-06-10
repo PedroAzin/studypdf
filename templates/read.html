@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block html_lang %}en{% endblock %}
+{% block title %}{{ book.title }} | StudyPDF Coach{% endblock %}
+{% block body_class %}reader-screen{% endblock %}
+{% block topbar_nav %}
+  <a class="active" href="{{ url_for('books.books') }}">Estante</a>
+  <a href="{{ url_for('books.books') }}">Recentes</a>
+  <a href="{{ url_for('notes.book_highlights', book_id=book.id) }}">Destaques</a>
+  <a href="{{ url_for('notes.book_notes', book_id=book.id) }}">Anotacoes</a>
+  <a href="{{ url_for('books.export_book_html', book_id=book.id) }}">Exportar HTML</a>
+{% endblock %}
+{% block topbar_actions %}
+  <div class="font-size-control" aria-label="Tamanho da fonte">
+    <button type="button" data-font-decrease aria-label="Diminuir fonte">A-</button>
+    <span data-font-size-label>100%</span>
+    <button type="button" data-font-increase aria-label="Aumentar fonte">A+</button>
+  </div>
+{% endblock %}
+{% block content %}
+<div class="reader-layout">
+  <aside class="chapter-sidebar" data-chapter-sidebar lang="pt-BR" translate="no">
+    <div class="reader-panel-header">
+      <div>
+        <span class="reader-panel-kicker">Navegacao</span>
+        <h1>Capitulos</h1>
+      </div>
+      <div class="reader-panel-actions" aria-label="Acoes do sumario">
+        <button class="sidebar-toggle" type="button" data-chapter-toggle aria-label="Recolher capitulos" aria-expanded="true">III</button>
+      </div>
+    </div>
+
+    <form class="reprocess-form" action="{{ url_for('books.reprocess_book', book_id=book.id) }}" method="post">
+      <button class="secondary full-width" type="submit">Reprocessar PDF</button>
+    </form>
+    <button class="danger full-width" type="button" data-reset-open>Reiniciar livro</button>
+    <a class="reader-export-link" href="{{ url_for('books.original_pdf', book_id=book.id) }}">PDF original</a>
+
+    <div class="book-summary">
+      <strong>{{ book.title }}</strong>
+      <span>{{ book.author or "Autor nao informado" }}</span>
+      <div class="reader-progress">
+        <div>
+          <span data-progress-label>{{ progress_percent }}% lido</span>
+          <small data-current-page>pagina {{ book.last_page_read or 1 }} de {{ total_pages }}</small>
+        </div>
+        <div class="shelf-progress">
+          <span data-progress-bar style="width: {{ progress_percent }}%"></span>
+        </div>
+      </div>
+    </div>
+
+    {% if chapters %}
+      <nav class="chapter-nav" aria-label="Capitulos">
+        <h2>Table of Contents</h2>
+        {% for chapter in chapters %}
+          <a class="chapter-link level-{{ chapter.level }}{% if chapter.show_progress %} is-book-chapter{% else %} is-outline-item{% endif %}" href="#pagina-{{ chapter.start_page }}" data-roman="{{ chapter.roman }}">
+            <span class="chapter-title">{{ chapter.title }}</span>
+            <span class="chapter-meta">
+              <small>{{ chapter.start_page }}</small>
+              {% if chapter.show_progress %}
+                <span class="chapter-progress-ring" style="--chapter-progress: {{ chapter.progress }}%" data-roman="{{ chapter.chapter_roman }}" aria-label="{{ chapter.progress }}% lido neste capitulo">
+                  <span>{{ chapter.progress }}%</span>
+                </span>
+              {% endif %}
+            </span>
+            {% if chapter.show_progress %}
+              <span class="chapter-progress" aria-label="{{ chapter.progress }}% lido neste capitulo">
+                <span style="width: {{ chapter.progress }}%"></span>
+              </span>
+            {% endif %}
+          </a>
+        {% endfor %}
+      </nav>
+    {% else %}
+      <nav class="chapter-nav" aria-label="Paginas">
+        <h2>Pages</h2>
+        {% for page in pages %}
+          <a class="chapter-link" href="#pagina-{{ page.page_number }}" data-roman="{{ page.page_number }}">
+            <span>Pagina {{ page.page_number }}</span>
+            <small>{{ page.page_number }}</small>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+  </aside>
+
+  <article class="reader" lang="en" translate="yes" data-book-id="{{ book.id }}" data-total-pages="{{ total_pages }}" data-last-page-read="{{ book.last_page_read or 1 }}" data-understanding-ranges='{{ understanding_ranges | tojson }}'>
+    {% for page in pages %}
+      <section class="page{% if page.page_number in chapter_start_pages %} chapter-start{% endif %}" id="pagina-{{ page.page_number }}" data-page-number="{{ page.page_number }}">
+        <div class="page-label" translate="no">Page {{ page.page_number }}</div>
+        <div class="page-content">{{ page.html_content | safe }}</div>
+      </section>
+    {% endfor %}
+  </article>
+</div>
+
+<div id="selection-menu" class="selection-menu" lang="pt-BR" translate="no" hidden>
+  <button data-type="DUVIDA">Criar duvida</button>
+  <button data-type="ANOTACAO">Fazer anotacao</button>
+  <button data-type="DESTAQUE">Destacar</button>
+  <button data-type="TRABALHO">Relacionar ao trabalho</button>
+</div>
+
+<dialog id="note-dialog" lang="pt-BR" translate="no">
+  <form method="dialog" class="dialog-body">
+    <header>
+      <h2 id="dialog-title">Nova nota</h2>
+      <button class="icon-button" value="cancel" aria-label="Fechar">x</button>
+    </header>
+    <label>
+      Trecho selecionado
+      <textarea id="selected-text" readonly></textarea>
+    </label>
+    <label>
+      Minha nota
+      <textarea id="note-text" placeholder="Escreva sua duvida ou anotacao"></textarea>
+    </label>
+    <label>
+      Tags
+      <input id="note-tags" type="text" placeholder="replication, distributed-systems">
+    </label>
+    <footer>
+      <button class="secondary" value="cancel">Cancelar</button>
+      <button id="save-note" value="default">Salvar</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="reset-book-dialog" lang="pt-BR" translate="no">
+  <form method="post" action="{{ url_for('books.reset_book', book_id=book.id) }}" class="dialog-body">
+    <header>
+      <h2>Reiniciar livro</h2>
+      <button class="icon-button" value="cancel" aria-label="Fechar">x</button>
+    </header>
+    <p class="danger-copy">Esta limpeza remove notas, destaques, checkpoints de entendimento e volta o progresso para a pagina 1. O PDF e os capitulos processados serao mantidos.</p>
+    <label>
+      Digite REINICIAR para confirmar
+      <input name="confirmation" type="text" autocomplete="off" required pattern="REINICIAR">
+    </label>
+    <footer>
+      <button class="secondary" value="cancel">Cancelar</button>
+      <button class="danger" type="submit">Limpar tudo</button>
+    </footer>
+  </form>
+</dialog>
+
+<section class="understanding-check" data-understanding-check lang="pt-BR" translate="no" hidden>
+  <header>
+    <div>
+      <span>Checkpoint de entendimento</span>
+      <h2 data-check-topic>Topico</h2>
+    </div>
+    <button class="icon-button" type="button" data-check-dismiss aria-label="Fechar">x</button>
+  </header>
+  <p>Antes de seguir, registre se esse trecho ficou claro.</p>
+  <label>
+    Explique em 2 frases
+    <textarea data-check-summary placeholder="Qual foi a ideia principal desse topico?"></textarea>
+  </label>
+  <label>
+    O que ficou confuso?
+    <textarea data-check-doubt placeholder="Opcional"></textarea>
+  </label>
+  <div class="confidence-scale" role="group" aria-label="Nivel de confianca">
+    <button type="button" data-confidence="1">1</button>
+    <button type="button" data-confidence="2">2</button>
+    <button type="button" data-confidence="3">3</button>
+    <button type="button" data-confidence="4">4</button>
+    <button type="button" data-confidence="5">5</button>
+  </div>
+  <footer>
+    <button class="secondary" type="button" data-check-later>Revisar depois</button>
+    <button type="button" data-check-save>Salvar checkpoint</button>
+  </footer>
+</section>
+
+<script src="{{ url_for('static', filename='reader.js') }}"></script>
+{% endblock %}

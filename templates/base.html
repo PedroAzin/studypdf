@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="{% block html_lang %}pt-BR{% endblock %}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}StudyPDF Coach{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400..800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body class="{% block body_class %}{% endblock %}">
+    <header class="topbar" lang="pt-BR" translate="no">
+      <a class="brand" href="{{ url_for('main.index') }}">StudyPDF Coach</a>
+      <nav class="topbar-nav" aria-label="Navegacao principal">
+        {% block topbar_nav %}
+          <a href="{{ url_for('books.books') }}">Estante</a>
+          <a href="{{ url_for('main.search') }}">Busca</a>
+        {% endblock %}
+      </nav>
+      {% block topbar_actions %}{% endblock %}
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ book.title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', _external=True) }}">
+  </head>
+  <body class="reader-screen exported-book">
+    <main>
+      <article class="reader">
+        {% for page in pages %}
+          <section class="page" id="pagina-{{ page.page_number }}">
+            <div class="page-label">Page {{ page.page_number }}</div>
+            <div class="page-content">{{ page.html_content | safe }}</div>
+          </section>
+        {% endfor %}
+      </article>
+    </main>
+  </body>
+</html>
