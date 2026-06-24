@@ -3,10 +3,16 @@ from studypdf.services import processing
 
 
 def test_cron_process_books_reports_zero_when_queue_is_empty(client):
-    response = client.post("/cron/process-books")
+    response = client.post("/cron/process-books", headers={"Authorization": "Bearer test-cron-token"})
 
     assert response.status_code == 200
     assert response.get_json() == {"processed_jobs": 0, "status": "ok"}
+
+
+def test_cron_process_books_requires_token(client):
+    response = client.post("/cron/process-books")
+
+    assert response.status_code == 401
 
 
 def test_original_pdf_and_html_export_are_available(client, ready_book):

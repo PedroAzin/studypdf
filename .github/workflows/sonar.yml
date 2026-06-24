@@ -33,6 +33,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
       STUDYPDF_STORAGE_BUCKET: studypdf
       STUDYPDF_SIGNING_KEY: test-signing-key
+      STUDYPDF_CRON_TOKEN: test-cron-token
 
     steps:
       - name: Checkout
@@ -56,8 +57,32 @@ jobs:
       - name: Run tests with coverage
         run: python -m pytest
 
+      - name: Verify coverage report
+        run: |
+          test -s coverage.xml
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("coverage.xml").getroot()
+          print("coverage line-rate:", root.attrib.get("line-rate"))
+          print("coverage branch-rate:", root.attrib.get("branch-rate"))
+          print("covered files:")
+          for class_node in root.findall(".//class")[:20]:
+              print("-", class_node.attrib.get("filename"))
+          PY
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
       - name: SonarQube Cloud Scan
         uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          args: >
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.coverage.exclusions=static/**
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 

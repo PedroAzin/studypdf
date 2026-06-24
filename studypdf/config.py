@@ -7,6 +7,7 @@ STUDYPDF_DATABASE_URL = os.environ.get("STUDYPDF_DATABASE_URL", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 STUDYPDF_STORAGE_BUCKET = os.environ.get("STUDYPDF_STORAGE_BUCKET", "studypdf").strip()
+STUDYPDF_CRON_TOKEN = os.environ.get("STUDYPDF_CRON_TOKEN", "").strip()
 
 ALLOWED_EXTENSIONS = {".pdf"}
 NOTE_TYPES = {"DUVIDA", "DESTAQUE", "ANOTACAO", "TRABALHO", "REVISAR"}

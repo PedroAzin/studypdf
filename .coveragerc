@@ -1,0 +1,7 @@
+[run]
+relative_files = True
+source =
+    studypdf
+
+[xml]
+output = coverage.xml

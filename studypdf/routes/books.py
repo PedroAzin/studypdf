@@ -14,6 +14,7 @@ from studypdf.config import (
     JOB_STATUS_PENDING,
     NOTE_TYPES,
     FEATURE_UNDERSTANDING_CHECKS,
+    STUDYPDF_CRON_TOKEN,
 )
 from studypdf.db import get_db, insert_returning_id, open_db, row_to_dict
 from studypdf.domain.reader import build_chapter_nav, percent_read, real_chapter_ranges, sanitize_reader_html
@@ -278,10 +279,18 @@ def book_event_item(row):
 
 @books_bp.post("/cron/process-books")
 def cron_process_books():
+    require_cron_token()
     processed = 0
     while process_next_job():
         processed += 1
     return jsonify({"status": "ok", "processed_jobs": processed})
+
+
+def require_cron_token():
+    if not STUDYPDF_CRON_TOKEN:
+        abort(503, "STUDYPDF_CRON_TOKEN nao configurado.")
+    if request.headers.get("Authorization") != f"Bearer {STUDYPDF_CRON_TOKEN}":
+        abort(401)
 
 
 @books_bp.post("/books/<int:book_id>/reprocess")

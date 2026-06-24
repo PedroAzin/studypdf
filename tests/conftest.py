@@ -19,6 +19,7 @@ def app(tmp_path, monkeypatch):
         pytest.skip("Defina STUDYPDF_TEST_DATABASE_URL para rodar testes com PostgreSQL.")
 
     monkeypatch.setattr(db_module, "STUDYPDF_DATABASE_URL", database_url)
+    monkeypatch.setattr(books_routes, "STUDYPDF_CRON_TOKEN", "test-cron-token")
     monkeypatch.setattr(app_factory, "start_processing_worker", lambda _app: None)
     storage_objects = {}
     install_storage_fake(monkeypatch, books_routes, books_service, processing_service, storage_objects)
