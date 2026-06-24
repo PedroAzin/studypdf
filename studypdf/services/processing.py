@@ -55,16 +55,53 @@ def upload_assets(book_storage_key, assets_dir):
 
 
 def replace_book_content(conn, book_id, pages, chapters):
-    conn.execute("DELETE FROM pages WHERE book_id = ?", (book_id,))
     conn.execute("DELETE FROM chapters WHERE book_id = ?", (book_id,))
     conn.execute("DELETE FROM understanding_checks WHERE book_id = ?", (book_id,))
-    conn.executemany(
-        """
-        INSERT INTO pages (book_id, page_number, text_content, html_content)
-        VALUES (?, ?, ?, ?)
-        """,
-        [(book_id, page["page_number"], page["text_content"], page["html_content"]) for page in pages],
-    )
+    replace_pages(conn, book_id, pages)
+    replace_chapters(conn, book_id, chapters)
+
+
+def replace_pages(conn, book_id, pages):
+    existing_pages = {
+        row["page_number"]: row["id"]
+        for row in conn.execute(
+            "SELECT id, page_number FROM pages WHERE book_id = ?",
+            (book_id,),
+        ).fetchall()
+    }
+    new_page_numbers = {page["page_number"] for page in pages}
+
+    for page in pages:
+        page_id = existing_pages.get(page["page_number"])
+        if page_id:
+            conn.execute(
+                """
+                UPDATE pages
+                SET text_content = ?,
+                    html_content = ?
+                WHERE id = ?
+                """,
+                (page["text_content"], page["html_content"], page_id),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO pages (book_id, page_number, text_content, html_content)
+                VALUES (?, ?, ?, ?)
+                """,
+                (book_id, page["page_number"], page["text_content"], page["html_content"]),
+            )
+
+    stale_page_ids = [
+        page_id
+        for page_number, page_id in existing_pages.items()
+        if page_number not in new_page_numbers
+    ]
+    if stale_page_ids:
+        conn.executemany("DELETE FROM pages WHERE id = ?", [(page_id,) for page_id in stale_page_ids])
+
+
+def replace_chapters(conn, book_id, chapters):
     conn.executemany(
         """
         INSERT INTO chapters (book_id, title, slug, level, start_page, end_page)

@@ -85,13 +85,22 @@ def test_process_next_job_marks_book_ready_and_replaces_content(app, tmp_path, m
         db = get_db()
         book = db.execute("SELECT status, processed_at FROM books WHERE id = ?", (book_id,)).fetchone()
         job = db.execute("SELECT status, error_message FROM processing_jobs WHERE book_id = ?", (book_id,)).fetchone()
-        note = db.execute("SELECT page_id FROM notes WHERE book_id = ?", (book_id,)).fetchone()
+        note = db.execute(
+            """
+            SELECT notes.page_id, pages.text_content
+            FROM notes
+            JOIN pages ON pages.id = notes.page_id
+            WHERE notes.book_id = ?
+            """,
+            (book_id,),
+        ).fetchone()
         assert book["status"] == "READY"
         assert book["processed_at"] is not None
         assert job["status"] == "DONE"
         assert job["error_message"] is None
         assert db.execute("SELECT COUNT(*) AS total FROM pages WHERE book_id = ?", (book_id,)).fetchone()["total"] == 2
-        assert note["page_id"] != old_page_id
+        assert note["page_id"] == old_page_id
+        assert note["text_content"] == "Two"
 
 
 def test_process_next_job_marks_book_failed_when_pdf_is_missing(app, tmp_path):
