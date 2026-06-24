@@ -1,6 +1,4 @@
-from pathlib import Path
-
-from studypdf.db import get_db
+from studypdf.db import get_db, insert_returning_id
 from studypdf.services import processing
 
 
@@ -23,12 +21,11 @@ def test_original_pdf_and_html_export_are_available(client, ready_book):
 
 def test_delete_book_removes_records_and_files(client, app, ready_book):
     book_id = ready_book["id"]
-    pdf_path = Path(ready_book["pdf_path"])
 
     response = client.delete(f"/api/books/{book_id}")
 
     assert response.status_code == 200
-    assert not pdf_path.parent.exists()
+    assert not any(key.startswith("books/ready-book") for key in app.config["TEST_STORAGE_OBJECTS"])
     with app.app_context():
         db = get_db()
         assert db.execute("SELECT id FROM books WHERE id = ?", (book_id,)).fetchone() is None
@@ -37,19 +34,17 @@ def test_delete_book_removes_records_and_files(client, app, ready_book):
 
 def test_process_next_job_marks_book_ready_and_replaces_content(app, tmp_path, monkeypatch):
     with app.app_context():
-        book_dir = tmp_path / "books" / "queued-success"
-        book_dir.mkdir(parents=True)
-        pdf_path = book_dir / "original.pdf"
-        pdf_path.write_bytes(b"%PDF-1.4\n")
+        storage_key = "books/queued-success/original.pdf"
+        app.config["TEST_STORAGE_OBJECTS"][storage_key] = b"%PDF-1.4\n"
         db = get_db()
-        cursor = db.execute(
+        book_id = insert_returning_id(
+            db,
             """
             INSERT INTO books (title, original_filename, file_path, created_at, status)
             VALUES ('Queued', 'queued.pdf', ?, '2026-01-01T00:00:00+00:00', 'PROCESSING')
             """,
-            (str(pdf_path),),
+            (storage_key,),
         )
-        book_id = cursor.lastrowid
         db.execute(
             "INSERT INTO processing_jobs (book_id, status, created_at) VALUES (?, 'PENDING', '2026-01-01T00:00:00+00:00')",
             (book_id,),
@@ -93,16 +88,16 @@ def test_process_next_job_marks_book_ready_and_replaces_content(app, tmp_path, m
 
 def test_process_next_job_marks_book_failed_when_pdf_is_missing(app, tmp_path):
     with app.app_context():
-        missing_pdf = tmp_path / "books" / "missing" / "original.pdf"
+        missing_pdf = "books/missing/original.pdf"
         db = get_db()
-        cursor = db.execute(
+        book_id = insert_returning_id(
+            db,
             """
             INSERT INTO books (title, original_filename, file_path, created_at, status)
             VALUES ('Missing', 'missing.pdf', ?, '2026-01-01T00:00:00+00:00', 'PROCESSING')
             """,
-            (str(missing_pdf),),
+            (missing_pdf,),
         )
-        book_id = cursor.lastrowid
         db.execute(
             "INSERT INTO processing_jobs (book_id, status, created_at) VALUES (?, 'PENDING', '2026-01-01T00:00:00+00:00')",
             (book_id,),
