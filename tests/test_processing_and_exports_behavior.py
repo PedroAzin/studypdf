@@ -49,12 +49,20 @@ def test_process_next_job_marks_book_ready_and_replaces_content(app, tmp_path, m
             "INSERT INTO processing_jobs (book_id, status, created_at) VALUES (?, 'PENDING', '2026-01-01T00:00:00+00:00')",
             (book_id,),
         )
+        old_page_id = insert_returning_id(
+            db,
+            """
+            INSERT INTO pages (book_id, page_number, text_content, html_content)
+            VALUES (?, 2, 'old text', '<p>old text</p>')
+            """,
+            (book_id,),
+        )
         db.execute(
             """
             INSERT INTO notes (book_id, page_id, page_number, selected_text, note_text, note_type, tags, created_at)
-            VALUES (?, 999, 2, 'selected', 'note', 'ANOTACAO', '', '2026-01-01T00:00:00+00:00')
+            VALUES (?, ?, 2, 'selected', 'note', 'ANOTACAO', '', '2026-01-01T00:00:00+00:00')
             """,
-            (book_id,),
+            (book_id, old_page_id),
         )
         db.commit()
 
@@ -83,7 +91,7 @@ def test_process_next_job_marks_book_ready_and_replaces_content(app, tmp_path, m
         assert job["status"] == "DONE"
         assert job["error_message"] is None
         assert db.execute("SELECT COUNT(*) AS total FROM pages WHERE book_id = ?", (book_id,)).fetchone()["total"] == 2
-        assert note["page_id"] != 999
+        assert note["page_id"] != old_page_id
 
 
 def test_process_next_job_marks_book_failed_when_pdf_is_missing(app, tmp_path):

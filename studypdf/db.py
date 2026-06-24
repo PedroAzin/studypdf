@@ -103,7 +103,8 @@ class PostgresConnection:
         return self.conn.execute(to_postgres_sql(sql), params)
 
     def executemany(self, sql, params_seq):
-        return self.conn.executemany(to_postgres_sql(sql), params_seq)
+        with self.conn.cursor() as cursor:
+            return cursor.executemany(to_postgres_sql(sql), params_seq)
 
     def executescript(self, script):
         with self.conn.cursor() as cursor:
