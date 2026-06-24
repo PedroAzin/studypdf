@@ -6,6 +6,9 @@ import requests
 from studypdf.config import STUDYPDF_STORAGE_BUCKET, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL
 
 
+APPLICATION_JSON = "application/json"
+
+
 class StorageError(RuntimeError):
     pass
 
@@ -46,7 +49,7 @@ def ensure_bucket():
 
     response = requests.post(
         storage_url("bucket"),
-        headers=storage_headers("application/json"),
+        headers=storage_headers(APPLICATION_JSON),
         json={"id": STUDYPDF_STORAGE_BUCKET, "name": STUDYPDF_STORAGE_BUCKET, "public": False},
         timeout=30,
     )
@@ -97,7 +100,7 @@ def delete_keys(keys):
         return
     response = requests.delete(
         storage_url(f"object/{STUDYPDF_STORAGE_BUCKET}"),
-        headers=storage_headers("application/json"),
+        headers=storage_headers(APPLICATION_JSON),
         json={"prefixes": keys},
         timeout=60,
     )
@@ -108,7 +111,7 @@ def delete_keys(keys):
 def list_keys(prefix):
     response = requests.post(
         storage_url(f"object/list/{STUDYPDF_STORAGE_BUCKET}"),
-        headers=storage_headers("application/json"),
+        headers=storage_headers(APPLICATION_JSON),
         json={"prefix": prefix.strip("/"), "limit": 1000, "offset": 0, "sortBy": {"column": "name", "order": "asc"}},
         timeout=60,
     )
