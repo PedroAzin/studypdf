@@ -1,11 +1,9 @@
-import shutil
-from pathlib import Path
-
 from flask import abort
 
 from studypdf.config import BOOK_STATUS_READY, BOOK_STATUS_PROCESSING, BOOK_STATUS_FAILED
 from studypdf.db import get_db, row_to_dict
 from studypdf.domain.reader import percent_read, visible_book_chapters
+from studypdf.storage import delete_prefix
 
 
 def get_book_or_404(book_id):
@@ -20,9 +18,14 @@ def is_book_ready(book):
 
 
 def delete_book_files(book):
-    book_dir = Path(book["file_path"]).parent
-    if book_dir.exists():
-        shutil.rmtree(book_dir)
+    storage_prefix = storage_prefix_for_book(book)
+    if storage_prefix:
+        delete_prefix(storage_prefix)
+
+
+def storage_prefix_for_book(book):
+    parts = (book["file_path"] or "").split("/")
+    return "/".join(parts[:2]) if len(parts) >= 2 else ""
 
 
 def delete_book_record(book_id):

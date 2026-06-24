@@ -4,6 +4,7 @@ const uploadStatus = document.querySelector("[data-upload-status]");
 const uploadStatusText = document.querySelector("[data-upload-status-text]");
 const uploadProgress = document.querySelector("[data-upload-progress]");
 const uploadDetail = document.querySelector("[data-upload-detail]");
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
 
 function setUploadState({ text, detail, progress, indeterminate = false, error = false }) {
   uploadStatus.hidden = false;
@@ -18,7 +19,8 @@ function parseError(xhr) {
   try {
     const payload = JSON.parse(xhr.responseText);
     return payload.error || "Nao foi possivel enviar o PDF.";
-  } catch (_error) {
+  } catch (error) {
+    console.debug("Resposta de erro do upload nao estava em JSON.", error);
     return "Nao foi possivel enviar o PDF.";
   }
 }
@@ -81,19 +83,12 @@ if (uploadForm) {
     xhr.addEventListener("load", () => {
       uploadButton.disabled = false;
       if (xhr.status >= 200 && xhr.status < 300) {
-        let redirectUrl = "";
-        try {
-          redirectUrl = JSON.parse(xhr.responseText).redirect_url;
-        } catch (_error) {
-          redirectUrl = xhr.responseURL;
-        }
-
         setUploadState({
           text: "PDF enviado",
           detail: "Livro enviado para a fila de processamento. Abrindo a estante...",
           progress: 100,
         });
-        window.location.href = redirectUrl || "/books";
+        globalThis.location.href = "/books";
         return;
       }
 
@@ -127,6 +122,7 @@ if (uploadForm) {
 
     xhr.open("POST", uploadForm.action);
     xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+    xhr.setRequestHeader("X-CSRFToken", csrfToken);
     xhr.timeout = 10 * 60 * 1000;
     xhr.send(formData);
   });

@@ -32,7 +32,7 @@ Usuario leitor.
 ## Fluxos alternativos
 
 - Usuario clica em `Revisar depois`: checkpoint é salvo com confiança baixa e status `REVIEW`.
-- Usuario fecha o painel: subtópico é ignorado temporariamente no navegador atual via `localStorage`.
+- Usuario fecha o painel: subtópico é ignorado apenas na sessao atual da pagina.
 
 ## Rotas
 

@@ -1,31 +1,34 @@
-from pathlib import Path
+import os
 
 import pytest
 
-from studypdf.db import get_db, init_db
+from studypdf.db import SCHEMA_TABLES, get_db, init_db
 
 
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     import studypdf.app_factory as app_factory
     import studypdf.db as db_module
-    import studypdf.routes.books as books_routes
 
-    data_dir = tmp_path / "data"
-    books_dir = tmp_path / "books"
-    data_dir.mkdir()
-    books_dir.mkdir()
+    database_url = os.environ.get("STUDYPDF_TEST_DATABASE_URL", "").strip()
+    if not database_url:
+        pytest.skip("Defina STUDYPDF_TEST_DATABASE_URL para rodar testes com PostgreSQL.")
 
-    monkeypatch.setattr(db_module, "DATA_DIR", data_dir)
-    monkeypatch.setattr(db_module, "DB_PATH", data_dir / "test.sqlite3")
-    monkeypatch.setattr(books_routes, "BOOKS_DIR", books_dir)
+    monkeypatch.setattr(db_module, "STUDYPDF_DATABASE_URL", database_url)
     monkeypatch.setattr(app_factory, "start_processing_worker", lambda _app: None)
 
     app = app_factory.create_app()
-    app.config.update(TESTING=True)
+    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     with app.app_context():
         init_db()
+        clear_database()
     return app
+
+
+def clear_database():
+    db = get_db()
+    db.execute(f"TRUNCATE TABLE {', '.join(reversed(SCHEMA_TABLES))} RESTART IDENTITY CASCADE")
+    db.commit()
 
 
 @pytest.fixture

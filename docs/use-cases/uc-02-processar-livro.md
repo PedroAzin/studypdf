@@ -14,8 +14,8 @@ Worker interno ou cron job.
 2. Servico busca o primeiro job `PENDING`.
 3. Job muda para `RUNNING`.
 4. Livro muda para `PROCESSING`.
-5. PDF original e aberto com PyMuPDF.
-6. Imagens sao extraidas para `books/<storage_id>/assets`.
+5. PDF original e baixado do Supabase Storage para diretorio temporario.
+6. Imagens sao extraidas temporariamente e enviadas para o Supabase Storage.
 7. Texto e blocos sao convertidos em HTML semantico.
 8. Capitulos reais sao detectados a partir do TOC.
 9. Paginas antigas e capitulos antigos sao substituidos.
@@ -38,6 +38,7 @@ Worker interno ou cron job.
 - `studypdf/services/processing.py`
 - `studypdf/pdf/extractor.py`
 - `studypdf/db.py`
+- `studypdf/storage.py`
 - `studypdf/config.py`
 
 ## Dados gravados
@@ -47,5 +48,4 @@ Worker interno ou cron job.
 - `books.status`
 - `books.processed_at`
 - `processing_jobs.status`
-- Imagens em `books/<storage_id>/assets`
-
+- Objetos `books/<storage_id>/assets/*` no Supabase Storage

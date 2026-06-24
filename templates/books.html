@@ -55,6 +55,7 @@
               <a class="button secondary" href="{{ url_for('notes.book_notes', book_id=book.id) }}">Notas</a>
               <a class="button secondary" href="{{ url_for('notes.book_highlights', book_id=book.id) }}">Destaques</a>
               <form action="{{ url_for('books.reset_book', book_id=book.id) }}" method="post" onsubmit="return confirmResetBook(this);">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="confirmation">
                 <button class="danger" type="submit">Reiniciar</button>
               </form>
@@ -62,6 +63,7 @@
               <span class="button disabled" aria-disabled="true">Continuar</span>
             {% endif %}
             <form action="{{ url_for('books.delete_book', book_id=book.id) }}" method="post" onsubmit="return confirm('Remover este livro e todas as notas?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="danger" type="submit">Remover</button>
             </form>
           </div>

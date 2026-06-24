@@ -11,6 +11,7 @@
   </div>
 
   <form class="note-form" method="post" action="{% if mode == 'create' %}{{ url_for('notes.create_note_form', book_id=book.id) }}{% else %}{{ url_for('notes.update_note_form', note_id=note.id) }}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
       <label>
         Pagina

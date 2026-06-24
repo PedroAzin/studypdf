@@ -11,7 +11,8 @@ flowchart TD
   Browser["Browser / UI"] --> Routes["routes/* - HTTP blueprints"]
   Routes --> Services["services/* - casos de uso"]
   Services --> Domain["domain/* - regras puras"]
-  Services --> DB["db.py - SQLite"]
+  Services --> DB["db.py - PostgreSQL/Supabase"]
+  Services --> Storage["storage.py - Supabase Storage"]
   Services --> PDF["pdf/extractor.py - processamento PDF"]
   Routes --> Templates["templates/* - Jinja"]
   Routes --> Static["static/* - JS/CSS"]
@@ -39,10 +40,13 @@ flowchart TD
 ### Infraestrutura
 
 - `studypdf/db.py`
-  - Abre e fecha conexao SQLite.
+  - Abre e fecha conexao PostgreSQL/Supabase.
   - Inicializa schema.
-  - Aplica migracoes leves com `ensure_column`.
-  - Converte `sqlite3.Row` para dict.
+  - Converte linhas para dict.
+
+- `studypdf/storage.py`
+  - Envia, baixa, lista e remove arquivos no Supabase Storage.
+  - Mantem PDFs originais e assets extraidos fora do filesystem local.
 
 - `studypdf/config.py`
   - Caminhos base.
@@ -72,7 +76,7 @@ flowchart TD
   - Extrai paginas, texto e imagens com PyMuPDF.
   - Converte blocos de texto em HTML semantico.
   - Detecta capitulos a partir do TOC do PDF.
-  - Salva imagens extraidas em `books/<id>/assets`.
+  - Salva imagens extraidas em diretorio temporario para upload no Supabase Storage.
 
 ### Servicos
 
@@ -118,7 +122,6 @@ flowchart TD
 
 - Rotas podem depender de servicos, dominio e infraestrutura.
 - Servicos podem depender de dominio e infraestrutura.
-- Dominio nao deve depender de Flask, SQLite, filesystem ou request.
+- Dominio nao deve depender de Flask, banco de dados, filesystem ou request.
 - Extracao PDF nao deve depender de Flask.
 - Templates e JS nao devem conter regra de negocio persistente.
-

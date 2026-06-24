@@ -1,10 +1,12 @@
+import os
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-BOOKS_DIR = BASE_DIR / "books"
-DB_PATH = DATA_DIR / "studypdf.sqlite3"
+STUDYPDF_DATABASE_URL = os.environ.get("STUDYPDF_DATABASE_URL", "").strip()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+STUDYPDF_STORAGE_BUCKET = os.environ.get("STUDYPDF_STORAGE_BUCKET", "studypdf").strip()
 
 ALLOWED_EXTENSIONS = {".pdf"}
 NOTE_TYPES = {"DUVIDA", "DESTAQUE", "ANOTACAO", "TRABALHO", "REVISAR"}
@@ -22,3 +24,10 @@ JOB_STATUS_RUNNING = "RUNNING"
 JOB_STATUS_DONE = "DONE"
 JOB_STATUS_FAILED = "FAILED"
 JOB_POLL_SECONDS = 3
+
+FEATURE_UNDERSTANDING_CHECKS = os.environ.get("STUDYPDF_UNDERSTANDING_CHECKS", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}

@@ -5,7 +5,7 @@ const shelfCards = new Map(
   ]),
 );
 
-if (window.EventSource && shelfCards.size > 0) {
+if (globalThis.EventSource && shelfCards.size > 0) {
   const events = new EventSource("/api/books/events");
 
   events.addEventListener("books", (event) => {
@@ -22,7 +22,7 @@ if (window.EventSource && shelfCards.size > 0) {
     }
 
     if (shouldReload) {
-      window.location.reload();
+      globalThis.location.reload();
     }
   });
 }

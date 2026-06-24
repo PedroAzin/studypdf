@@ -8,9 +8,15 @@ As rotas foram separadas por feature para reduzir acoplamento:
 - `books`: upload, estante, leitor e processamento.
 - `notes`: notas, destaques, busca e exportacao.
 
-## SQLite com migracoes leves
+## PostgreSQL/Supabase
 
-O projeto usa SQLite direto. A funcao `init_db()` cria tabelas e `ensure_column()` adiciona colunas novas sem exigir ferramenta externa de migracao.
+O projeto usa PostgreSQL via Supabase. A connection string fica em `STUDYPDF_DATABASE_URL`; sem essa variavel o app nao inicia a camada de banco.
+
+A funcao `init_db()` cria o schema necessario com `CREATE TABLE IF NOT EXISTS`, mantendo a inicializacao simples enquanto o projeto ainda nao usa uma ferramenta externa de migracao.
+
+## Supabase Storage
+
+PDFs originais e imagens extraidas ficam no Supabase Storage. O banco guarda a chave do objeto em `books.file_path`; rotas HTTP do app baixam os bytes do bucket quando precisam servir PDF ou asset ao navegador.
 
 ## Processamento em background
 
@@ -20,7 +26,7 @@ O upload nao processa o PDF durante a requisicao. Ele:
 2. Cria o livro com status `PROCESSING`.
 3. Cria job `PENDING`.
 4. Redireciona para a estante.
-5. Worker ou cron processa o job.
+5. Worker ou cron processa o job usando lock `FOR UPDATE SKIP LOCKED`.
 6. SSE atualiza a estante.
 
 ## Conversao de PDF para HTML
@@ -46,4 +52,3 @@ O leitor marca a pagina como `lang="en"` e o conteudo do livro como `translate="
 ## Complexidade
 
 As novas funcoes foram mantidas pequenas e coesas. A excecao consciente e `init_db()`, que e declarativa de schema e nao concentra regras condicionais.
-

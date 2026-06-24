@@ -2,48 +2,84 @@ const form = document.querySelector(".search-form");
 const input = document.querySelector("#search-query");
 const results = document.querySelector("#search-results");
 
-function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  }[char]));
+function clearResults() {
+  results.replaceChildren();
+}
+
+function appendMutedMessage(message) {
+  const paragraph = document.createElement("p");
+  paragraph.className = "muted";
+  paragraph.textContent = message;
+  results.append(paragraph);
+}
+
+function noteMetaItem(text) {
+  const span = document.createElement("span");
+  span.textContent = text;
+  return span;
+}
+
+function noteLink(href, label, className = "button") {
+  const link = document.createElement("a");
+  link.className = className;
+  link.href = href;
+  link.textContent = label;
+  return link;
+}
+
+function renderNote(item) {
+  const article = document.createElement("article");
+  article.className = "note-card";
+
+  const meta = document.createElement("div");
+  meta.className = "note-meta";
+  meta.append(
+    noteMetaItem(item.book_title),
+    noteMetaItem(item.note_type),
+    noteMetaItem(`Pagina ${item.page_number}`),
+  );
+  if (item.tags) {
+    meta.append(noteMetaItem(item.tags));
+  }
+
+  const quote = document.createElement("blockquote");
+  quote.textContent = item.selected_text;
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  actions.append(
+    noteLink(`/notes/${item.id}`, "Abrir", "button secondary"),
+    noteLink(`/api/notes/${item.id}/export`, "Exportar para IA"),
+  );
+
+  article.append(meta, quote);
+  if (item.note_text) {
+    const noteText = document.createElement("p");
+    noteText.textContent = item.note_text;
+    article.append(noteText);
+  }
+  article.append(actions);
+  return article;
 }
 
 function render(items) {
+  clearResults();
   if (items.length === 0) {
-    results.innerHTML = '<p class="muted">Nenhum resultado encontrado.</p>';
+    appendMutedMessage("Nenhum resultado encontrado.");
     return;
   }
-
-  results.innerHTML = items.map((item) => `
-    <article class="note-card">
-      <div class="note-meta">
-        <span>${escapeHtml(item.book_title)}</span>
-        <span>${escapeHtml(item.note_type)}</span>
-        <span>Pagina ${item.page_number}</span>
-        ${item.tags ? `<span>${escapeHtml(item.tags)}</span>` : ""}
-      </div>
-      <blockquote>${escapeHtml(item.selected_text)}</blockquote>
-      ${item.note_text ? `<p>${escapeHtml(item.note_text)}</p>` : ""}
-      <div class="actions">
-        <a class="button secondary" href="/notes/${item.id}">Abrir</a>
-        <a class="button" href="/api/notes/${item.id}/export">Exportar para IA</a>
-      </div>
-    </article>
-  `).join("");
+  results.append(...items.map(renderNote));
 }
 
-async function runSearch(query) {
+function runSearch(query) {
   if (!query) {
-    results.innerHTML = '<p class="muted">Digite um termo para pesquisar.</p>';
-    return;
+    clearResults();
+    appendMutedMessage("Digite um termo para pesquisar.");
+    return Promise.resolve();
   }
-  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-  const data = await response.json();
-  render(data.results);
+  return fetch(`/api/search?q=${encodeURIComponent(query)}`)
+    .then((response) => response.json())
+    .then((data) => render(data.results));
 }
 
 form.addEventListener("submit", (event) => {

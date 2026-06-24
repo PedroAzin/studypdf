@@ -1,4 +1,5 @@
 import shutil
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -15,6 +16,7 @@ from studypdf.config import (
 )
 from studypdf.db import open_db
 from studypdf.pdf.extractor import extract_pdf_pages
+from studypdf.storage import download_file, upload_file
 from studypdf.time_utils import now_iso
 
 worker_started = False
@@ -25,12 +27,12 @@ def process_book_with_connection(conn, book_id):
     if book is None:
         raise RuntimeError(f"Livro nao encontrado: {book_id}")
 
-    pdf_path = Path(book["file_path"])
-    if not pdf_path.exists():
-        raise FileNotFoundError("PDF original nao encontrado.")
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pdf_path = download_file(book["file_path"], Path(tmp_dir) / "original.pdf")
+        assets_dir = reset_assets_dir(pdf_path)
+        pages, chapters = extract_pdf_pages(pdf_path, assets_dir, book_id)
+        upload_assets(book["file_path"], assets_dir)
 
-    assets_dir = reset_assets_dir(pdf_path)
-    pages, chapters = extract_pdf_pages(pdf_path, assets_dir, book_id)
     replace_book_content(conn, book_id, pages, chapters)
     mark_book_ready(conn, book_id)
     refresh_note_page_links(conn, book_id)
@@ -41,6 +43,15 @@ def reset_assets_dir(pdf_path):
     if assets_dir.exists():
         shutil.rmtree(assets_dir)
     return assets_dir
+
+
+def upload_assets(book_storage_key, assets_dir):
+    if not assets_dir.exists():
+        return
+    assets_prefix = f"{Path(book_storage_key).parent.as_posix()}/assets"
+    for path in assets_dir.iterdir():
+        if path.is_file():
+            upload_file(f"{assets_prefix}/{path.name}", path)
 
 
 def replace_book_content(conn, book_id, pages, chapters):
@@ -107,13 +118,14 @@ def process_next_job():
 
 
 def claim_next_job(conn):
-    conn.execute("BEGIN IMMEDIATE")
+    conn.execute("BEGIN")
     job = conn.execute(
         """
         SELECT * FROM processing_jobs
         WHERE status = ?
         ORDER BY created_at
         LIMIT 1
+        FOR UPDATE SKIP LOCKED
         """,
         (JOB_STATUS_PENDING,),
     ).fetchone()

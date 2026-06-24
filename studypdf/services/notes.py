@@ -1,7 +1,7 @@
 from flask import abort
 
 from studypdf.config import NOTE_TYPES
-from studypdf.db import get_db
+from studypdf.db import get_db, insert_returning_id
 from studypdf.domain.notes import note_form_data
 from studypdf.time_utils import now_iso
 
@@ -47,7 +47,9 @@ def create_note(book_id, source):
     data = note_form_data(source)
     validate_note_fields(data)
     page = page_for_note(book_id, data["page_number"])
-    cursor = get_db().execute(
+    db = get_db()
+    note_id = insert_returning_id(
+        db,
         """
         INSERT INTO notes
             (book_id, page_id, page_number, selected_text, note_text, note_type, tags, created_at, updated_at)
@@ -55,8 +57,8 @@ def create_note(book_id, source):
         """,
         note_values(book_id, page, data),
     )
-    get_db().commit()
-    return cursor.lastrowid
+    db.commit()
+    return note_id
 
 
 def update_note(note_id, source):

@@ -97,10 +97,16 @@ def test_detect_chapters_filters_toc_to_real_book_chapters(tmp_path):
     finally:
         doc.close()
 
-    assert chapters[0]["slug"] == "01-chapter-1-reliable-systems"
-    assert chapters[0]["start_page"] == 2
-    assert chapters[0]["end_page"] == 2
-    assert chapters[1]["end_page"] == 3
+    assert [chapter["title"] for chapter in chapters] == [
+        "Preface",
+        "Chapter 1. Reliable Systems",
+        "Appendix",
+        "Chapter 2. Data Models",
+    ]
+    assert chapters[1]["slug"] == "02-chapter-1-reliable-systems"
+    assert chapters[1]["start_page"] == 2
+    assert chapters[1]["end_page"] == 2
+    assert chapters[3]["end_page"] == 3
 
 
 def test_extract_pdf_pages_returns_text_html_and_chapters(tmp_path):

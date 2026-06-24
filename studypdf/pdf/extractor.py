@@ -17,9 +17,9 @@ def page_text_to_html(text):
 
 def clean_pdf_text(text):
     text = text.strip()
-    text = re.sub(rf"[{SOFT_HYPHENS}]\s*\n\s*", "", text)
+    text = re.sub(rf"[{SOFT_HYPHENS}][ \t\r\f\v]*\n[ \t\r\f\v]*", "", text)
     text = re.sub(rf"(?<=[A-Za-z])[{SOFT_HYPHENS}]\s+(?=[a-z])", "", text)
-    text = re.sub(r"\s*\n\s*", " ", text)
+    text = " ".join(part.strip() for part in text.splitlines())
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -92,9 +92,9 @@ def block_text_html(block):
 
 
 def clean_rendered_text(text):
-    text = re.sub(rf"[{SOFT_HYPHENS}]\s*\n\s*", "", text)
+    text = re.sub(rf"[{SOFT_HYPHENS}][ \t\r\f\v]*\n[ \t\r\f\v]*", "", text)
     text = re.sub(rf"(?<=[A-Za-z])[{SOFT_HYPHENS}]\s+(?=[a-z])", "", text)
-    text = re.sub(r"\s*\n\s*", " ", text)
+    text = " ".join(part.strip() for part in text.splitlines())
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -145,7 +145,7 @@ def save_image(block, assets_dir, page_number, image_index):
         return None
 
     ext = block.get("ext") or "png"
-    digest = hashlib.sha1(image_bytes).hexdigest()[:12]
+    digest = hashlib.sha256(image_bytes).hexdigest()[:12]
     filename = f"page-{page_number:03}-img-{image_index:02}-{digest}.{ext}"
     assets_dir.mkdir(parents=True, exist_ok=True)
     path = assets_dir / filename
@@ -155,7 +155,7 @@ def save_image(block, assets_dir, page_number, image_index):
 
 
 def detect_chapters(doc):
-    candidates = chapter_candidates(doc.get_toc())
+    candidates = toc_candidates(doc.get_toc())
     if not candidates:
         return []
 
@@ -171,6 +171,14 @@ def chapter_candidates(toc):
         {"level": level, "title": title.strip(), "start_page": start_page}
         for level, title, start_page, *_rest in toc
         if (title or "").strip() and is_book_chapter_title(title)
+    ]
+
+
+def toc_candidates(toc):
+    return [
+        {"level": level, "title": title.strip(), "start_page": start_page}
+        for level, title, start_page, *_rest in toc
+        if (title or "").strip()
     ]
 
 

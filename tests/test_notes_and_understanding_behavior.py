@@ -54,7 +54,9 @@ def test_note_form_flow_redirects_to_detail(client, ready_book):
     assert response.headers["Location"].startswith("/notes/")
 
 
-def test_understanding_check_persists_review_and_updates_same_topic(client, app, ready_book):
+def test_understanding_check_persists_review_and_updates_same_topic(client, app, ready_book, monkeypatch):
+    monkeypatch.setattr("studypdf.routes.books.FEATURE_UNDERSTANDING_CHECKS", True)
+
     book_id = ready_book["id"]
     first_response = client.post(
         f"/api/books/{book_id}/understanding-checks",
@@ -94,10 +96,23 @@ def test_understanding_check_persists_review_and_updates_same_topic(client, app,
         assert total == 1
 
 
-def test_understanding_check_requires_topic_identity(client, ready_book):
+def test_understanding_check_requires_topic_identity(client, ready_book, monkeypatch):
+    monkeypatch.setattr("studypdf.routes.books.FEATURE_UNDERSTANDING_CHECKS", True)
+
     response = client.post(
         f"/api/books/{ready_book['id']}/understanding-checks",
         json={"topic_key": "", "topic_title": "", "page_number": 2, "confidence": 3},
     )
 
     assert response.status_code == 400
+
+
+def test_understanding_check_api_is_disabled_by_default(client, ready_book):
+    get_response = client.get(f"/api/books/{ready_book['id']}/understanding-checks")
+    post_response = client.post(
+        f"/api/books/{ready_book['id']}/understanding-checks",
+        json={"topic_key": "topic-1", "topic_title": "Topic", "page_number": 2, "confidence": 3},
+    )
+
+    assert get_response.status_code == 404
+    assert post_response.status_code == 404

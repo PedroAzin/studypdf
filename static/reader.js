@@ -24,19 +24,22 @@ const checkLater = document.querySelector("[data-check-later]");
 const checkDismiss = document.querySelector("[data-check-dismiss]");
 const resetDialog = document.querySelector("#reset-book-dialog");
 const resetOpen = document.querySelector("[data-reset-open]");
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+const chapterLinks = [...document.querySelectorAll(".chapter-link.is-book-chapter")];
+const understandingEnabled = reader.dataset.understandingEnabled === "1";
 
 let currentSelection = null;
 let currentNoteType = "DUVIDA";
 let lastSavedPage = Number(reader.dataset.lastPageRead || 1);
 let saveProgressTimer = null;
 let progressReady = false;
-let readerFontPercent = Number(window.localStorage.getItem("readerFontPercent") || 100);
+let readerFontPercent = 100;
 let understandingTopics = [];
 let savedUnderstandingChecks = new Set();
-let dismissedUnderstandingChecks = new Set(JSON.parse(window.localStorage.getItem(checkDismissKey()) || "[]"));
+let dismissedUnderstandingChecks = new Set();
 let activeUnderstandingTopic = null;
 let selectedConfidence = 3;
-let understandingRanges = JSON.parse(reader.dataset.understandingRanges || "[]");
+let understandingRanges = understandingEnabled ? JSON.parse(reader.dataset.understandingRanges || "[]") : [];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -46,7 +49,6 @@ function applyReaderFontSize(percent) {
   readerFontPercent = clamp(percent, 80, 140);
   reader.style.setProperty("--reader-font-scale", String(readerFontPercent / 100));
   if (fontSizeLabel) fontSizeLabel.textContent = `${readerFontPercent}%`;
-  window.localStorage.setItem("readerFontPercent", String(readerFontPercent));
 }
 
 applyReaderFontSize(readerFontPercent);
@@ -66,12 +68,10 @@ function setChapterNavCollapsed(collapsed) {
     chapterToggle.setAttribute("aria-expanded", String(!collapsed));
     chapterToggle.setAttribute("aria-label", collapsed ? "Expandir capitulos" : "Recolher capitulos");
   }
-  window.localStorage.setItem("chapterNavCollapsed", collapsed ? "1" : "0");
 }
 
 if (chapterToggle) {
-  const savedCollapsed = window.localStorage.getItem("chapterNavCollapsed") === "1";
-  setChapterNavCollapsed(savedCollapsed);
+  setChapterNavCollapsed(false);
   chapterToggle.addEventListener("click", () => {
     setChapterNavCollapsed(!chapterSidebar.classList.contains("is-collapsed"));
   });
@@ -115,10 +115,10 @@ function showMenu(selection, selectedText) {
 }
 
 document.addEventListener("mouseup", (event) => {
-  window.setTimeout(() => {
+  globalThis.setTimeout(() => {
     if (menu.contains(event.target) || dialog.open) return;
 
-    const selection = window.getSelection();
+    const selection = globalThis.getSelection();
     const selectedText = selection.toString().trim();
     if (selectedText.length > 0 && reader.contains(selection.anchorNode)) {
       showMenu(selection, selectedText);
@@ -132,7 +132,7 @@ document.addEventListener("pointerdown", (event) => {
     currentSelection = null;
     delete menu.dataset.selectedText;
     delete menu.dataset.pageNumber;
-    window.getSelection()?.removeAllRanges();
+    globalThis.getSelection()?.removeAllRanges();
   }
 }, true);
 
@@ -169,7 +169,8 @@ saveButton.addEventListener("click", async (event) => {
   try {
     const response = await fetch("/api/notes", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+      credentials: "same-origin",
       body: JSON.stringify({
         book_id: Number(reader.dataset.bookId),
         page_number: currentSelection.pageNumber,
@@ -185,7 +186,7 @@ saveButton.addEventListener("click", async (event) => {
     }
 
     dialog.close();
-    window.getSelection().removeAllRanges();
+    globalThis.getSelection().removeAllRanges();
   } catch (error) {
     alert(`Nao foi possivel salvar a nota: ${error.message}`);
   } finally {
@@ -195,7 +196,8 @@ saveButton.addEventListener("click", async (event) => {
 
 function visiblePageNumber() {
   const pages = [...document.querySelectorAll(".page")];
-  const viewportAnchor = window.innerHeight * 0.38;
+  const viewportHeight = document.documentElement.clientHeight || 720;
+  const viewportAnchor = viewportHeight * 0.38;
   let bestPage = pages[0];
   let bestDistance = Number.POSITIVE_INFINITY;
 
@@ -218,6 +220,30 @@ function updateProgressUi(pageNumber, percentRead) {
   if (progressBar) progressBar.style.width = `${percentRead}%`;
 }
 
+function chapterProgress(startPage, endPage, pageNumber) {
+  if (!startPage || pageNumber < startPage) return 0;
+  if (pageNumber >= endPage) return 100;
+  const span = Math.max(1, endPage - startPage + 1);
+  return clamp(Math.round(((pageNumber - startPage + 1) / span) * 100), 1, 99);
+}
+
+function updateChapterProgressUi(pageNumber) {
+  for (const link of chapterLinks) {
+    const startPage = Number(link.dataset.startPage || 0);
+    const endPage = Number(link.dataset.endPage || startPage);
+    const progress = chapterProgress(startPage, endPage, pageNumber);
+    const ring = link.querySelector(".chapter-progress-ring");
+    const label = link.querySelector("[data-chapter-progress-label]");
+    const bar = link.querySelector("[data-chapter-progress-bar]");
+
+    link.classList.toggle("is-current", pageNumber >= startPage && pageNumber <= endPage);
+    ring?.style.setProperty("--chapter-progress", `${progress}%`);
+    if (ring) ring.setAttribute("aria-label", `${progress}% lido neste capitulo`);
+    if (label) label.textContent = `${progress}%`;
+    if (bar) bar.style.width = `${progress}%`;
+  }
+}
+
 async function saveReadingProgress(pageNumber) {
   if (!pageNumber || pageNumber === lastSavedPage) return;
   lastSavedPage = pageNumber;
@@ -225,28 +251,32 @@ async function saveReadingProgress(pageNumber) {
   try {
     const response = await fetch(`/api/books/${Number(reader.dataset.bookId)}/progress`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+      credentials: "same-origin",
       body: JSON.stringify({ page_number: pageNumber }),
     });
     if (!response.ok) return;
     const payload = await response.json();
     updateProgressUi(payload.page_number, payload.percent_read);
-  } catch (_error) {
+  } catch (error) {
+    console.debug("Nao foi possivel salvar o progresso de leitura.", error);
     // Progress is opportunistic; reading must not be interrupted if it fails.
   }
 }
 
 function scheduleProgressSave() {
   if (!progressReady) return;
-  window.clearTimeout(saveProgressTimer);
-  saveProgressTimer = window.setTimeout(() => {
+  updateChapterProgressUi(visiblePageNumber());
+  globalThis.clearTimeout(saveProgressTimer);
+  saveProgressTimer = globalThis.setTimeout(() => {
     saveReadingProgress(visiblePageNumber());
   }, 350);
 }
 
 function restoreReadingPosition() {
-  if (window.location.hash) {
+  if (globalThis.location.hash) {
     progressReady = true;
+    globalThis.setTimeout(() => updateChapterProgressUi(visiblePageNumber()), 100);
     return;
   }
 
@@ -255,13 +285,9 @@ function restoreReadingPosition() {
     document.querySelector(`#pagina-${lastPageRead}`)?.scrollIntoView({ block: "start" });
   }
 
-  window.setTimeout(() => {
+  globalThis.setTimeout(() => {
     progressReady = true;
   }, 500);
-}
-
-function checkDismissKey() {
-  return `understandingDismissed:${reader?.dataset.bookId || "book"}`;
 }
 
 function topicElements() {
@@ -294,15 +320,16 @@ function collectUnderstandingTopics() {
   }).filter((topic) => topic.title.length > 0);
 }
 
-async function loadUnderstandingChecks() {
-  try {
-    const response = await fetch(`/api/books/${Number(reader.dataset.bookId)}/understanding-checks`);
-    if (!response.ok) return;
-    const payload = await response.json();
-    savedUnderstandingChecks = new Set((payload.checks || []).map((check) => check.topic_key));
-  } catch (_error) {
-    savedUnderstandingChecks = new Set();
-  }
+function loadUnderstandingChecks() {
+  return fetch(`/api/books/${Number(reader.dataset.bookId)}/understanding-checks`)
+    .then((response) => (response.ok ? response.json() : { checks: [] }))
+    .then((payload) => {
+      savedUnderstandingChecks = new Set((payload.checks || []).map((check) => check.topic_key));
+    })
+    .catch((error) => {
+      console.debug("Nao foi possivel carregar checkpoints de entendimento.", error);
+      savedUnderstandingChecks = new Set();
+    });
 }
 
 function topicIsDue(topic) {
@@ -310,11 +337,12 @@ function topicIsDue(topic) {
   const endTop = topic.endElement
     ? topic.endElement.getBoundingClientRect().top
     : topic.heading.closest(".page").getBoundingClientRect().bottom;
-  return endTop < window.innerHeight * 0.42;
+  const viewportHeight = document.documentElement.clientHeight || 720;
+  return endTop < viewportHeight * 0.42;
 }
 
 function maybeShowUnderstandingCheck() {
-  if (!progressReady || !checkPanel?.hidden || activeUnderstandingTopic) return;
+  if (!understandingEnabled || !progressReady || !checkPanel?.hidden || activeUnderstandingTopic) return;
   const topic = understandingTopics.find(topicIsDue);
   if (topic) showUnderstandingCheck(topic);
 }
@@ -344,7 +372,6 @@ function setConfidence(value) {
 function dismissUnderstandingCheck() {
   if (!activeUnderstandingTopic) return;
   dismissedUnderstandingChecks.add(activeUnderstandingTopic.key);
-  window.localStorage.setItem(checkDismissKey(), JSON.stringify([...dismissedUnderstandingChecks]));
   hideUnderstandingCheck();
 }
 
@@ -355,7 +382,8 @@ async function saveUnderstandingCheck(reviewLater = false) {
   try {
     const response = await fetch(`/api/books/${Number(reader.dataset.bookId)}/understanding-checks`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+      credentials: "same-origin",
       body: JSON.stringify({
         topic_key: topic.key,
         topic_title: topic.title,
@@ -373,29 +401,37 @@ async function saveUnderstandingCheck(reviewLater = false) {
   }
 }
 
-document.querySelectorAll("[data-confidence]").forEach((button) => {
-  button.addEventListener("click", () => setConfidence(button.dataset.confidence));
-});
+if (understandingEnabled) {
+  document.querySelectorAll("[data-confidence]").forEach((button) => {
+    button.addEventListener("click", () => setConfidence(button.dataset.confidence));
+  });
 
-checkSave?.addEventListener("click", () => saveUnderstandingCheck(false));
-checkLater?.addEventListener("click", () => saveUnderstandingCheck(true));
-checkDismiss?.addEventListener("click", dismissUnderstandingCheck);
+  checkSave?.addEventListener("click", () => saveUnderstandingCheck(false));
+  checkLater?.addEventListener("click", () => saveUnderstandingCheck(true));
+  checkDismiss?.addEventListener("click", dismissUnderstandingCheck);
+}
 resetOpen?.addEventListener("click", () => resetDialog?.showModal());
-resetDialog?.addEventListener("submit", () => {
-  window.localStorage.removeItem(checkDismissKey());
-});
 
 document.addEventListener("scroll", scheduleProgressSave, { passive: true });
 document.addEventListener("scroll", maybeShowUnderstandingCheck, { passive: true });
-window.addEventListener("beforeunload", () => {
+globalThis.addEventListener("hashchange", () => {
+  globalThis.setTimeout(() => updateChapterProgressUi(visiblePageNumber()), 100);
+});
+globalThis.addEventListener("load", () => {
+  updateChapterProgressUi(visiblePageNumber());
+});
+globalThis.addEventListener("beforeunload", () => {
   const pageNumber = visiblePageNumber();
   if (navigator.sendBeacon) {
-    const payload = new Blob([JSON.stringify({ page_number: pageNumber })], {
-      type: "application/json",
-    });
+    const payload = new FormData();
+    payload.append("csrf_token", csrfToken);
+    payload.append("page_number", String(pageNumber));
     navigator.sendBeacon(`/api/books/${Number(reader.dataset.bookId)}/progress`, payload);
   }
 });
 restoreReadingPosition();
-collectUnderstandingTopics();
-loadUnderstandingChecks();
+if (understandingEnabled) {
+  collectUnderstandingTopics();
+  loadUnderstandingChecks();
+}
+updateChapterProgressUi(visiblePageNumber());

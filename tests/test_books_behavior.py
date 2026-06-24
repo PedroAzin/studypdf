@@ -42,12 +42,27 @@ def test_upload_queues_pdf_and_redirects_to_shelf(client, app):
         assert job["status"] == "PENDING"
 
 
-def test_reader_exposes_only_real_chapter_ranges_for_understanding_checks(client, ready_book):
+def test_reader_hides_understanding_checks_when_feature_is_disabled(client, ready_book):
     response = client.get(f"/books/{ready_book['id']}/read")
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
-    ranges = json.loads(soup.select_one(".reader")["data-understanding-ranges"])
+    reader = soup.select_one(".reader")
+    assert reader["data-understanding-enabled"] == "0"
+    assert json.loads(reader["data-understanding-ranges"]) == []
+    assert soup.select_one("[data-understanding-check]") is None
+
+
+def test_reader_exposes_only_real_chapter_ranges_for_understanding_checks(client, ready_book, monkeypatch):
+    monkeypatch.setattr("studypdf.routes.books.FEATURE_UNDERSTANDING_CHECKS", True)
+
+    response = client.get(f"/books/{ready_book['id']}/read")
+
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
+    reader = soup.select_one(".reader")
+    assert reader["data-understanding-enabled"] == "1"
+    ranges = json.loads(reader["data-understanding-ranges"])
     assert [item["title"] for item in ranges] == [
         "Chapter 1. Reliable Systems",
         "Chapter 2. Data Models",

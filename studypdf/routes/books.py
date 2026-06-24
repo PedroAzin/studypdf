@@ -1,21 +1,21 @@
 import json
-import shutil
+import mimetypes
+import tempfile
 import time
 import uuid
 from pathlib import Path
 
-import fitz
-from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, url_for
 
 from studypdf.config import (
     ALLOWED_EXTENSIONS,
-    BOOKS_DIR,
     BOOK_STATUS_PROCESSING,
     BOOK_STATUS_READY,
     JOB_STATUS_PENDING,
     NOTE_TYPES,
+    FEATURE_UNDERSTANDING_CHECKS,
 )
-from studypdf.db import get_db, open_db, row_to_dict
+from studypdf.db import get_db, insert_returning_id, open_db, row_to_dict
 from studypdf.domain.reader import build_chapter_nav, percent_read, real_chapter_ranges, sanitize_reader_html
 from studypdf.pdf.extractor import extract_pdf_pages
 from studypdf.services.books import (
@@ -29,6 +29,7 @@ from studypdf.services.books import (
     shelf_books,
 )
 from studypdf.services.processing import mark_book_ready, process_next_job, refresh_note_page_links, replace_book_content, reset_assets_dir
+from studypdf.storage import delete_keys, download_bytes, download_file, upload_bytes, upload_file
 from studypdf.services.understanding import book_understanding_checks, save_understanding_check
 from studypdf.time_utils import now_iso
 
@@ -39,7 +40,7 @@ def wants_json_response():
     return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 
-@books_bp.route("/books")
+@books_bp.route("/books", methods=["GET"])
 def books():
     return render_template("books.html", books=shelf_books())
 
@@ -61,16 +62,11 @@ def upload_book():
 
 def save_uploaded_book(uploaded, original_filename, title, author):
     storage_id = uuid.uuid4().hex
-    book_dir = BOOKS_DIR / storage_id
-    book_dir.mkdir(parents=True, exist_ok=True)
-    pdf_path = book_dir / "original.pdf"
+    storage_key = f"books/{storage_id}/original.pdf"
     try:
-        book_id = create_processing_book(uploaded, original_filename, title, author, pdf_path)
-    except (fitz.FileDataError, fitz.EmptyFileError):
-        cleanup_failed_upload(book_dir)
-        abort(400, "Nao foi possivel abrir o PDF. O arquivo pode estar corrompido, vazio ou protegido por senha.")
+        book_id = create_processing_book(uploaded, original_filename, title, author, storage_key)
     except Exception:
-        cleanup_failed_upload(book_dir)
+        get_db().rollback()
         raise
 
     redirect_url = url_for("books.books")
@@ -79,33 +75,31 @@ def save_uploaded_book(uploaded, original_filename, title, author):
     return redirect(redirect_url)
 
 
-def create_processing_book(uploaded, original_filename, title, author, pdf_path):
+def create_processing_book(uploaded, original_filename, title, author, storage_key):
     db = get_db()
-    uploaded.save(pdf_path)
-    cursor = db.execute(
-        """
-        INSERT INTO books
-            (title, author, original_filename, file_path, created_at, status, processing_error)
-        VALUES (?, ?, ?, ?, ?, ?, NULL)
-        """,
-        (title, author, original_filename, str(pdf_path), now_iso(), BOOK_STATUS_PROCESSING),
-    )
-    book_id = cursor.lastrowid
-    db.execute(
-        """
-        INSERT INTO processing_jobs (book_id, status, created_at)
-        VALUES (?, ?, ?)
-        """,
-        (book_id, JOB_STATUS_PENDING, now_iso()),
-    )
-    db.commit()
+    upload_bytes(storage_key, uploaded.read(), "application/pdf")
+    try:
+        book_id = insert_returning_id(
+            db,
+            """
+            INSERT INTO books
+                (title, author, original_filename, file_path, created_at, status, processing_error)
+            VALUES (?, ?, ?, ?, ?, ?, NULL)
+            """,
+            (title, author, original_filename, storage_key, now_iso(), BOOK_STATUS_PROCESSING),
+        )
+        db.execute(
+            """
+            INSERT INTO processing_jobs (book_id, status, created_at)
+            VALUES (?, ?, ?)
+            """,
+            (book_id, JOB_STATUS_PENDING, now_iso()),
+        )
+        db.commit()
+    except Exception:
+        delete_keys([storage_key])
+        raise
     return book_id
-
-
-def cleanup_failed_upload(book_dir):
-    get_db().rollback()
-    if book_dir.exists():
-        shutil.rmtree(book_dir)
 
 
 @books_bp.delete("/api/books/<int:book_id>")
@@ -137,7 +131,7 @@ def api_reset_book(book_id):
     return jsonify({"status": "reset", "book_id": book_id})
 
 
-@books_bp.route("/books/<int:book_id>/read")
+@books_bp.route("/books/<int:book_id>/read", methods=["GET"])
 def read_book(book_id):
     book = get_book_or_404(book_id)
     if not is_book_ready(book):
@@ -152,7 +146,8 @@ def read_book(book_id):
         pages=pages,
         chapters=build_chapter_nav(chapters, total_pages, book["last_page_read"]),
         chapter_start_pages={chapter["start_page"] for chapter in chapters},
-        understanding_ranges=real_chapter_ranges(chapters, total_pages),
+        understanding_enabled=FEATURE_UNDERSTANDING_CHECKS,
+        understanding_ranges=real_chapter_ranges(chapters, total_pages) if FEATURE_UNDERSTANDING_CHECKS else [],
         total_pages=total_pages,
         progress_percent=percent_read(book["last_page_read"], total_pages),
         note_types=sorted(NOTE_TYPES),
@@ -199,6 +194,8 @@ def update_progress(book_id):
 
 @books_bp.get("/api/books/<int:book_id>/understanding-checks")
 def understanding_checks(book_id):
+    if not FEATURE_UNDERSTANDING_CHECKS:
+        abort(404)
     get_book_or_404(book_id)
     checks = book_understanding_checks(book_id)
     return jsonify({"checks": checks})
@@ -206,12 +203,16 @@ def understanding_checks(book_id):
 
 @books_bp.post("/api/books/<int:book_id>/understanding-checks")
 def save_understanding(book_id):
+    if not FEATURE_UNDERSTANDING_CHECKS:
+        abort(404)
     get_book_or_404(book_id)
     check_id = save_understanding_check(book_id, request.get_json(force=True, silent=True) or {})
     return jsonify({"id": check_id, "status": "saved"})
 
 
 def progress_payload():
+    if request.form:
+        return request.form
     payload = request.get_json(force=True, silent=True)
     if payload is None and request.data:
         try:
@@ -221,7 +222,7 @@ def progress_payload():
     return payload or {}
 
 
-@books_bp.route("/api/books/events")
+@books_bp.route("/api/books/events", methods=["GET"])
 def book_events():
     return Response(book_event_stream(), mimetype="text/event-stream")
 
@@ -286,27 +287,31 @@ def cron_process_books():
 @books_bp.post("/books/<int:book_id>/reprocess")
 def reprocess_book(book_id):
     book = get_book_or_404(book_id)
-    pdf_path = Path(book["file_path"])
-    if not pdf_path.exists():
-        abort(404, "PDF original nao encontrado.")
-
-    assets_dir = reset_assets_dir(pdf_path)
-    pages, chapters = extract_pdf_pages(pdf_path, assets_dir, book_id)
-    db = get_db()
-    replace_book_content(db, book_id, pages, chapters)
-    mark_book_ready(db, book_id)
-    refresh_note_page_links(db, book_id)
-    db.commit()
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pdf_path = download_file(book["file_path"], Path(tmp_dir) / "original.pdf")
+        assets_dir = reset_assets_dir(pdf_path)
+        pages, chapters = extract_pdf_pages(pdf_path, assets_dir, book_id)
+        upload_assets(book["file_path"], assets_dir)
+        db = get_db()
+        replace_book_content(db, book_id, pages, chapters)
+        mark_book_ready(db, book_id)
+        refresh_note_page_links(db, book_id)
+        db.commit()
     return redirect(url_for("books.read_book", book_id=book_id))
 
 
-@books_bp.route("/books/<int:book_id>/original")
+@books_bp.route("/books/<int:book_id>/original", methods=["GET"])
 def original_pdf(book_id):
     book = get_book_or_404(book_id)
-    return send_file(book["file_path"], mimetype="application/pdf", download_name=book["original_filename"] or "book.pdf")
+    download_name = safe_download_name(book["original_filename"] or "book.pdf")
+    return bytes_response(
+        download_bytes(book["file_path"]),
+        mimetype="application/pdf",
+        disposition=f'inline; filename="{download_name}"',
+    )
 
 
-@books_bp.route("/books/<int:book_id>/html")
+@books_bp.route("/books/<int:book_id>/html", methods=["GET"])
 def export_book_html(book_id):
     book = get_book_or_404(book_id)
     pages = [
@@ -316,8 +321,38 @@ def export_book_html(book_id):
     return render_template("book_export.html", book=book, pages=pages)
 
 
-@books_bp.route("/books/<int:book_id>/assets/<path:filename>")
+@books_bp.route("/books/<int:book_id>/assets/<path:filename>", methods=["GET"])
 def book_asset(book_id, filename):
     book = get_book_or_404(book_id)
-    assets_dir = Path(book["file_path"]).parent / "assets"
-    return send_from_directory(assets_dir, filename)
+    key = asset_key(book["file_path"], filename)
+    return bytes_response(download_bytes(key), mimetype=mimetypes.guess_type(filename)[0] or "application/octet-stream")
+
+
+def upload_assets(book_storage_key, assets_dir):
+    if not assets_dir.exists():
+        return
+    assets_prefix = asset_prefix(book_storage_key)
+    for path in assets_dir.iterdir():
+        if path.is_file():
+            upload_file(f"{assets_prefix}/{path.name}", path)
+
+
+def asset_key(book_storage_key, filename):
+    if filename != Path(filename).name:
+        abort(404)
+    return f"{asset_prefix(book_storage_key)}/{filename}"
+
+
+def asset_prefix(book_storage_key):
+    return f"{Path(book_storage_key).parent.as_posix()}/assets"
+
+
+def safe_download_name(filename):
+    return Path(filename).name.replace('"', "") or "book.pdf"
+
+
+def bytes_response(content, mimetype, disposition=None):
+    response = Response(content, mimetype=mimetype)
+    if disposition:
+        response.headers["Content-Disposition"] = disposition
+    return response

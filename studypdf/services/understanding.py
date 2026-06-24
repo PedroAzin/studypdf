@@ -1,6 +1,6 @@
 from flask import abort
 
-from studypdf.db import get_db, row_to_dict
+from studypdf.db import get_db, insert_returning_id, row_to_dict
 from studypdf.domain.understanding import normalize_check_payload
 from studypdf.time_utils import now_iso
 
@@ -45,7 +45,9 @@ def check_by_topic(book_id, topic_key):
 
 
 def insert_check(book_id, data):
-    cursor = get_db().execute(
+    db = get_db()
+    check_id = insert_returning_id(
+        db,
         """
         INSERT INTO understanding_checks
             (book_id, topic_key, topic_title, page_number, confidence, summary, doubt, status, created_at, updated_at)
@@ -64,8 +66,8 @@ def insert_check(book_id, data):
             now_iso(),
         ),
     )
-    get_db().commit()
-    return cursor.lastrowid
+    db.commit()
+    return check_id
 
 
 def update_check(check_id, data):

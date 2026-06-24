@@ -10,7 +10,7 @@ from studypdf.services.notes import delete_note, get_note_or_404, merge_note_pay
 notes_bp = Blueprint("notes", __name__)
 
 
-@notes_bp.route("/books/<int:book_id>/notes")
+@notes_bp.route("/books/<int:book_id>/notes", methods=["GET"])
 def book_notes(book_id):
     book = get_book_or_404(book_id)
     notes = get_db().execute(
@@ -24,7 +24,7 @@ def book_notes(book_id):
     return render_template("notes.html", book=book, notes=notes)
 
 
-@notes_bp.route("/books/<int:book_id>/notes/new")
+@notes_bp.route("/books/<int:book_id>/notes/new", methods=["GET"])
 def new_note(book_id):
     book = get_book_or_404(book_id)
     return render_template(
@@ -63,7 +63,7 @@ def create_note_form(book_id):
     return redirect(url_for("notes.note_detail", note_id=note_id))
 
 
-@notes_bp.route("/books/<int:book_id>/highlights")
+@notes_bp.route("/books/<int:book_id>/highlights", methods=["GET"])
 def book_highlights(book_id):
     book = get_book_or_404(book_id)
     highlights = get_db().execute(
@@ -77,12 +77,12 @@ def book_highlights(book_id):
     return render_template("highlights.html", book=book, highlights=highlights)
 
 
-@notes_bp.route("/notes/<int:note_id>")
+@notes_bp.route("/notes/<int:note_id>", methods=["GET"])
 def note_detail(note_id):
     return render_template("note_detail.html", note=get_note_or_404(note_id))
 
 
-@notes_bp.route("/notes/<int:note_id>/edit")
+@notes_bp.route("/notes/<int:note_id>/edit", methods=["GET"])
 def edit_note(note_id):
     note = get_note_or_404(note_id)
     book = get_book_or_404(note["book_id"])
@@ -118,20 +118,25 @@ def create_note():
     return jsonify({"id": note_id, "status": "saved"})
 
 
-@notes_bp.route("/api/notes/<int:note_id>", methods=["GET", "PATCH", "DELETE"])
+@notes_bp.get("/api/notes/<int:note_id>")
 def api_note(note_id):
-    note = get_note_or_404(note_id)
-    if request.method == "GET":
-        return jsonify(row_to_dict(note))
-    if request.method == "DELETE":
-        delete_note(note_id)
-        return jsonify({"id": note_id, "status": "deleted"})
+    return jsonify(row_to_dict(get_note_or_404(note_id)))
 
+
+@notes_bp.patch("/api/notes/<int:note_id>")
+def patch_note(note_id):
+    note = get_note_or_404(note_id)
     update_note(note_id, merge_note_payload(note, request.get_json(force=True, silent=True) or {}))
     return jsonify({"id": note_id, "status": "updated"})
 
 
-@notes_bp.route("/api/search")
+@notes_bp.delete("/api/notes/<int:note_id>")
+def delete_api_note(note_id):
+    delete_note(note_id)
+    return jsonify({"id": note_id, "status": "deleted"})
+
+
+@notes_bp.route("/api/search", methods=["GET"])
 def api_search():
     query = request.args.get("q", "").strip()
     if not query:
@@ -167,7 +172,7 @@ def search_notes(query):
     return [row_to_dict(row) for row in rows]
 
 
-@notes_bp.route("/api/notes/<int:note_id>/export")
+@notes_bp.route("/api/notes/<int:note_id>/export", methods=["GET"])
 def export_note(note_id):
     note = export_note_record(note_id)
     before, after = selected_context(note["text_content"], note["selected_text"])

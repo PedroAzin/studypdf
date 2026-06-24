@@ -69,7 +69,7 @@ button.danger,
 .button.disabled {
   border-color: #d6d1bf;
   background: #ebe8dd;
-  color: #989489;
+  color: #5f5b52;
   cursor: not-allowed;
 }
 
@@ -758,7 +758,8 @@ h2 {
 }
 
 .chapter-link:hover,
-.chapter-link:focus {
+.chapter-link:focus,
+.chapter-link.is-current {
   border-left-color: var(--accent);
   background: #eeece2;
   color: #33352f;
@@ -810,6 +811,17 @@ h2 {
 
 .chapter-link.level-3 {
   padding-left: 34px;
+}
+
+.chapter-link.level-4,
+.chapter-link.level-5,
+.chapter-link.level-6 {
+  padding-left: 44px;
+}
+
+.chapter-link.is-outline-item {
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .chapter-sidebar.is-collapsed {

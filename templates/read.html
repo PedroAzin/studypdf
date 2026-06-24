@@ -30,6 +30,7 @@
     </div>
 
     <form class="reprocess-form" action="{{ url_for('books.reprocess_book', book_id=book.id) }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="secondary full-width" type="submit">Reprocessar PDF</button>
     </form>
     <button class="danger full-width" type="button" data-reset-open>Reiniciar livro</button>
@@ -53,19 +54,26 @@
       <nav class="chapter-nav" aria-label="Capitulos">
         <h2>Table of Contents</h2>
         {% for chapter in chapters %}
-          <a class="chapter-link level-{{ chapter.level }}{% if chapter.show_progress %} is-book-chapter{% else %} is-outline-item{% endif %}" href="#pagina-{{ chapter.start_page }}" data-roman="{{ chapter.roman }}">
+          <a
+            class="chapter-link level-{{ chapter.level }}{% if chapter.show_progress %} is-book-chapter{% else %} is-outline-item{% endif %}"
+            href="#pagina-{{ chapter.start_page }}"
+            data-roman="{{ chapter.roman }}"
+            data-start-page="{{ chapter.start_page }}"
+            data-end-page="{{ chapter.end_page }}"
+            data-progress-enabled="{{ '1' if chapter.show_progress else '0' }}"
+          >
             <span class="chapter-title">{{ chapter.title }}</span>
             <span class="chapter-meta">
               <small>{{ chapter.start_page }}</small>
               {% if chapter.show_progress %}
                 <span class="chapter-progress-ring" style="--chapter-progress: {{ chapter.progress }}%" data-roman="{{ chapter.chapter_roman }}" aria-label="{{ chapter.progress }}% lido neste capitulo">
-                  <span>{{ chapter.progress }}%</span>
+                  <span data-chapter-progress-label>{{ chapter.progress }}%</span>
                 </span>
               {% endif %}
             </span>
             {% if chapter.show_progress %}
               <span class="chapter-progress" aria-label="{{ chapter.progress }}% lido neste capitulo">
-                <span style="width: {{ chapter.progress }}%"></span>
+                <span data-chapter-progress-bar style="width: {{ chapter.progress }}%"></span>
               </span>
             {% endif %}
           </a>
@@ -84,7 +92,7 @@
     {% endif %}
   </aside>
 
-  <article class="reader" lang="en" translate="yes" data-book-id="{{ book.id }}" data-total-pages="{{ total_pages }}" data-last-page-read="{{ book.last_page_read or 1 }}" data-understanding-ranges='{{ understanding_ranges | tojson }}'>
+  <article class="reader" lang="en" translate="yes" data-book-id="{{ book.id }}" data-total-pages="{{ total_pages }}" data-last-page-read="{{ book.last_page_read or 1 }}" data-understanding-enabled="{{ '1' if understanding_enabled else '0' }}" data-understanding-ranges='{{ understanding_ranges | tojson }}'>
     {% for page in pages %}
       <section class="page{% if page.page_number in chapter_start_pages %} chapter-start{% endif %}" id="pagina-{{ page.page_number }}" data-page-number="{{ page.page_number }}">
         <div class="page-label" translate="no">Page {{ page.page_number }}</div>
@@ -128,6 +136,7 @@
 
 <dialog id="reset-book-dialog" lang="pt-BR" translate="no">
   <form method="post" action="{{ url_for('books.reset_book', book_id=book.id) }}" class="dialog-body">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <header>
       <h2>Reiniciar livro</h2>
       <button class="icon-button" value="cancel" aria-label="Fechar">x</button>
@@ -144,35 +153,37 @@
   </form>
 </dialog>
 
-<section class="understanding-check" data-understanding-check lang="pt-BR" translate="no" hidden>
-  <header>
-    <div>
-      <span>Checkpoint de entendimento</span>
-      <h2 data-check-topic>Topico</h2>
+{% if understanding_enabled %}
+  <section class="understanding-check" data-understanding-check lang="pt-BR" translate="no" hidden>
+    <header>
+      <div>
+        <span>Checkpoint de entendimento</span>
+        <h2 data-check-topic>Topico</h2>
+      </div>
+      <button class="icon-button" type="button" data-check-dismiss aria-label="Fechar">x</button>
+    </header>
+    <p>Antes de seguir, registre se esse trecho ficou claro.</p>
+    <label>
+      Explique em 2 frases
+      <textarea data-check-summary placeholder="Qual foi a ideia principal desse topico?"></textarea>
+    </label>
+    <label>
+      O que ficou confuso?
+      <textarea data-check-doubt placeholder="Opcional"></textarea>
+    </label>
+    <div class="confidence-scale" role="group" aria-label="Nivel de confianca">
+      <button type="button" data-confidence="1">1</button>
+      <button type="button" data-confidence="2">2</button>
+      <button type="button" data-confidence="3">3</button>
+      <button type="button" data-confidence="4">4</button>
+      <button type="button" data-confidence="5">5</button>
     </div>
-    <button class="icon-button" type="button" data-check-dismiss aria-label="Fechar">x</button>
-  </header>
-  <p>Antes de seguir, registre se esse trecho ficou claro.</p>
-  <label>
-    Explique em 2 frases
-    <textarea data-check-summary placeholder="Qual foi a ideia principal desse topico?"></textarea>
-  </label>
-  <label>
-    O que ficou confuso?
-    <textarea data-check-doubt placeholder="Opcional"></textarea>
-  </label>
-  <div class="confidence-scale" role="group" aria-label="Nivel de confianca">
-    <button type="button" data-confidence="1">1</button>
-    <button type="button" data-confidence="2">2</button>
-    <button type="button" data-confidence="3">3</button>
-    <button type="button" data-confidence="4">4</button>
-    <button type="button" data-confidence="5">5</button>
-  </div>
-  <footer>
-    <button class="secondary" type="button" data-check-later>Revisar depois</button>
-    <button type="button" data-check-save>Salvar checkpoint</button>
-  </footer>
-</section>
+    <footer>
+      <button class="secondary" type="button" data-check-later>Revisar depois</button>
+      <button type="button" data-check-save>Salvar checkpoint</button>
+    </footer>
+  </section>
+{% endif %}
 
-<script src="{{ url_for('static', filename='reader.js') }}"></script>
+<script src="{{ url_for('static', filename='reader.js', v=4) }}"></script>
 {% endblock %}

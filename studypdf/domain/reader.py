@@ -55,7 +55,7 @@ def roman_numeral(value):
 def is_book_chapter_title(title):
     text = clean_text(title or "")
     return bool(
-        re.match(r"^(chapter|capitulo|capÃ­tulo)\s+([0-9]+|[ivxlcdm]+)\b", text, flags=re.I)
+        re.match(r"^(chapter|capitulo|capÃ­tulo)\s+(\d+|[ivxlcdm]+)\b", text, flags=re.I)
     )
 
 

@@ -27,7 +27,8 @@ app.py                         # entrada da aplicacao
 studypdf/
   app_factory.py               # cria Flask app, registra blueprints, filtros e erros
   config.py                    # constantes e caminhos
-  db.py                        # infraestrutura SQLite
+  db.py                        # infraestrutura PostgreSQL/Supabase
+  storage.py                   # infraestrutura Supabase Storage
   domain/                      # regras puras e funcoes deterministicas
   pdf/                         # extracao e renderizacao de PDF
   services/                    # casos de uso e orquestracao de negocio
@@ -35,4 +36,3 @@ studypdf/
 templates/                     # telas Jinja
 static/                        # CSS e JavaScript do frontend
 ```
-

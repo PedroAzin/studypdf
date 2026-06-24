@@ -24,10 +24,6 @@ instance/
 .sonar/
 .scannerwork/
 
-# StudyPDF local data
-data/
-books/
-
 # OS/editor
 .DS_Store
 Thumbs.db

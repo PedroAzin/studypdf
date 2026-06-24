@@ -27,8 +27,9 @@ if (-not (Test-Path $python)) {
   --sonar-token=$env:SONAR_TOKEN `
   --sonar-project-key=$ProjectKey `
   --sonar-project-name=$ProjectKey `
-  --sonar-sources=studypdf,app.py `
+  --sonar-sources=studypdf,app.py,static `
   --sonar-tests=tests `
   --sonar-python-coverage-report-paths=coverage.xml `
+  --sonar-coverage-exclusions=static/** `
   --sonar-python-version=3.14 `
   --sonar-qualitygate-wait
