@@ -5,7 +5,7 @@ from flask import Flask, render_template
 from flask_wtf import CSRFProtect
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
-from studypdf.db import close_db, init_db
+from studypdf.db import check_database_connection, close_db, describe_database_target, init_db, validate_database_config
 from studypdf.routes.books import books_bp
 from studypdf.routes.main import main_bp
 from studypdf.routes.notes import notes_bp
@@ -22,12 +22,24 @@ def create_app():
     app.config["PROPAGATE_EXCEPTIONS"] = False
 
     csrf.init_app(app)
+    validate_startup_config(app)
     register_lifecycle(app)
     register_routes(app)
     register_template_filters(app)
     register_error_handlers(app)
     start_processing_worker(app)
     return app
+
+
+def validate_startup_config(app):
+    validate_database_config()
+    app.logger.info(
+        "Verificando conexao com banco de dados: %s (timeout=%ss)",
+        describe_database_target(),
+        os.environ.get("STUDYPDF_DATABASE_CONNECT_TIMEOUT_SECONDS", "10"),
+    )
+    check_database_connection()
+    app.logger.info("Conexao com banco de dados verificada.")
 
 
 def register_lifecycle(app):

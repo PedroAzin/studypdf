@@ -1,8 +1,9 @@
 from flask import g
 from psycopg import connect
 from psycopg.rows import dict_row
+from urllib.parse import urlsplit
 
-from .config import BOOK_STATUS_READY, STUDYPDF_DATABASE_URL
+from .config import BOOK_STATUS_READY, STUDYPDF_DATABASE_CONNECT_TIMEOUT_SECONDS, STUDYPDF_DATABASE_URL
 
 
 SCHEMA_TABLES = [
@@ -124,10 +125,47 @@ def to_postgres_sql(sql):
     return sql.replace("?", "%s")
 
 
-def connect_db():
+def validate_database_config():
     if not STUDYPDF_DATABASE_URL:
         raise RuntimeError("Defina STUDYPDF_DATABASE_URL com a connection string do Supabase/PostgreSQL.")
-    return PostgresConnection(connect(STUDYPDF_DATABASE_URL, row_factory=dict_row))
+
+
+def describe_database_target():
+    if not STUDYPDF_DATABASE_URL:
+        return "(nao configurado)"
+
+    try:
+        parsed = urlsplit(STUDYPDF_DATABASE_URL)
+    except ValueError:
+        return "(connection string configurada)"
+
+    if not parsed.hostname:
+        return "(connection string configurada)"
+
+    database = parsed.path.lstrip("/") or "(sem database)"
+    host = parsed.hostname
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    return f"{host}/{database}"
+
+
+def connect_db():
+    validate_database_config()
+    return PostgresConnection(
+        connect(
+            STUDYPDF_DATABASE_URL,
+            row_factory=dict_row,
+            connect_timeout=STUDYPDF_DATABASE_CONNECT_TIMEOUT_SECONDS,
+        )
+    )
+
+
+def check_database_connection():
+    db = connect_db()
+    try:
+        db.execute("SELECT 1")
+    finally:
+        db.close()
 
 
 def get_db():

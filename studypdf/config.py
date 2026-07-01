@@ -4,6 +4,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STUDYPDF_DATABASE_URL = os.environ.get("STUDYPDF_DATABASE_URL", "").strip()
+STUDYPDF_DATABASE_CONNECT_TIMEOUT_SECONDS = int(
+    os.environ.get("STUDYPDF_DATABASE_CONNECT_TIMEOUT_SECONDS", "10").strip()
+)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 STUDYPDF_STORAGE_BUCKET = os.environ.get("STUDYPDF_STORAGE_BUCKET", "studypdf").strip()
