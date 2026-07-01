@@ -24,6 +24,7 @@ const checkLater = document.querySelector("[data-check-later]");
 const checkDismiss = document.querySelector("[data-check-dismiss]");
 const resetDialog = document.querySelector("#reset-book-dialog");
 const resetOpen = document.querySelector("[data-reset-open]");
+const rulerToggle = document.querySelector("[data-ruler-toggle]");
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
 const chapterLinks = [...document.querySelectorAll(".chapter-link.is-book-chapter")];
 const understandingEnabled = reader.dataset.understandingEnabled === "1";
@@ -435,3 +436,142 @@ if (understandingEnabled) {
   loadUnderstandingChecks();
 }
 updateChapterProgressUi(visiblePageNumber());
+
+// --- Regua de foco (UC-18) ---
+let rulerEnabled = false;
+let rulerY = Math.round(globalThis.innerHeight / 2);
+let rulerEl = null;
+let rulerBand = null;
+let rulerTop = null;
+let rulerBottom = null;
+let rulerHud = null;
+let rulerTimerEl = null;
+let rulerInterval = null;
+let rulerSeconds = 0;
+
+function formatRulerTime(seconds) {
+  const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const s = String(seconds % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function createRulerElement() {
+  const el = document.createElement("div");
+  el.className = "reader-ruler";
+  el.setAttribute("aria-hidden", "true");
+  rulerTop = document.createElement("div");
+  rulerTop.className = "reader-ruler-overlay reader-ruler-overlay--top";
+  rulerBand = document.createElement("div");
+  rulerBand.className = "reader-ruler-band";
+  rulerBottom = document.createElement("div");
+  rulerBottom.className = "reader-ruler-overlay reader-ruler-overlay--bottom";
+  el.appendChild(rulerTop);
+  el.appendChild(rulerBand);
+  el.appendChild(rulerBottom);
+  return el;
+}
+
+function createHud() {
+  const hud = document.createElement("div");
+  hud.className = "ruler-hud";
+  hud.setAttribute("aria-live", "off");
+
+  rulerTimerEl = document.createElement("span");
+  rulerTimerEl.className = "ruler-hud-timer";
+  rulerTimerEl.setAttribute("aria-label", "Tempo em modo foco");
+  rulerTimerEl.textContent = "00:00";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "ruler-hud-close";
+  closeBtn.setAttribute("aria-label", "Sair do modo foco");
+  closeBtn.textContent = "x";
+  closeBtn.addEventListener("click", disableRuler);
+
+  hud.appendChild(rulerTimerEl);
+  hud.appendChild(closeBtn);
+  return hud;
+}
+
+function updateRulerPosition() {
+  if (!rulerEl || !rulerBand || !rulerTop || !rulerBottom) return;
+  const bandHeight = rulerBand.offsetHeight || 48;
+  const half = Math.round(bandHeight / 2);
+  const topY = Math.max(0, rulerY - half);
+  const bottomY = Math.min(globalThis.innerHeight, rulerY + half);
+  rulerBand.style.top = `${topY}px`;
+  rulerTop.style.height = `${topY}px`;
+  rulerBottom.style.top = `${bottomY}px`;
+  rulerBottom.style.height = `${Math.max(0, globalThis.innerHeight - bottomY)}px`;
+}
+
+function setRulerToggleState(active) {
+  if (!rulerToggle) return;
+  rulerToggle.classList.toggle("active", active);
+  rulerToggle.setAttribute("aria-pressed", String(active));
+  rulerToggle.setAttribute("aria-label", active ? "Desativar regua de foco" : "Ativar regua de foco");
+}
+
+function enableRuler() {
+  rulerEnabled = true;
+  rulerY = Math.round(globalThis.innerHeight / 2);
+  rulerEl = createRulerElement();
+  document.body.appendChild(rulerEl);
+  document.body.classList.add("ruler-active");
+  updateRulerPosition();
+
+  rulerSeconds = 0;
+  rulerHud = createHud();
+  document.body.appendChild(rulerHud);
+  rulerInterval = globalThis.setInterval(() => {
+    rulerSeconds += 1;
+    if (rulerTimerEl) rulerTimerEl.textContent = formatRulerTime(rulerSeconds);
+  }, 1000);
+
+  try { localStorage.setItem("studypdf_ruler_enabled", "1"); } catch (_) { /* ignore */ }
+  setRulerToggleState(true);
+}
+
+function disableRuler() {
+  rulerEnabled = false;
+  rulerEl?.remove();
+  rulerEl = null;
+  rulerBand = null;
+  rulerTop = null;
+  rulerBottom = null;
+  rulerHud?.remove();
+  rulerHud = null;
+  rulerTimerEl = null;
+  globalThis.clearInterval(rulerInterval);
+  rulerInterval = null;
+  rulerSeconds = 0;
+  document.body.classList.remove("ruler-active");
+  try { localStorage.setItem("studypdf_ruler_enabled", "0"); } catch (_) { /* ignore */ }
+  setRulerToggleState(false);
+}
+
+rulerToggle?.addEventListener("click", () => {
+  if (rulerEnabled) disableRuler();
+  else enableRuler();
+});
+
+document.addEventListener("mousemove", (event) => {
+  if (!rulerEnabled) return;
+  rulerY = event.clientY;
+  updateRulerPosition();
+}, { passive: true });
+
+document.addEventListener("keydown", (event) => {
+  if (!rulerEnabled) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const step = rulerBand?.offsetHeight || 48;
+    rulerY = event.key === "ArrowDown"
+      ? Math.min(globalThis.innerHeight, rulerY + step)
+      : Math.max(0, rulerY - step);
+    updateRulerPosition();
+  }
+});
+
+try {
+  if (localStorage.getItem("studypdf_ruler_enabled") === "1") enableRuler();
+} catch (_) { /* ignore */ }

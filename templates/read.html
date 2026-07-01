@@ -10,10 +10,13 @@
   <a href="{{ url_for('books.export_book_html', book_id=book.id) }}">Exportar HTML</a>
 {% endblock %}
 {% block topbar_actions %}
-  <div class="font-size-control" aria-label="Tamanho da fonte">
-    <button type="button" data-font-decrease aria-label="Diminuir fonte">A-</button>
-    <span data-font-size-label>100%</span>
-    <button type="button" data-font-increase aria-label="Aumentar fonte">A+</button>
+  <div class="topbar-tools">
+    <button type="button" class="reader-tool" data-ruler-toggle aria-label="Ativar régua de foco" aria-pressed="false">Régua</button>
+    <div class="font-size-control" aria-label="Tamanho da fonte">
+      <button type="button" data-font-decrease aria-label="Diminuir fonte">A-</button>
+      <span data-font-size-label>100%</span>
+      <button type="button" data-font-increase aria-label="Aumentar fonte">A+</button>
+    </div>
   </div>
 {% endblock %}
 {% block content %}
